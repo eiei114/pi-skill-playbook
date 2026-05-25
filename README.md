@@ -28,10 +28,25 @@ pi install npm:pi-skill-playbook
 
 Package version: `0.1.0`
 
-## Install locally
+## Install from GitHub
 
 ```bash
-cd C:/Users/Keisu/Projects/OSS/pi-skill-playbook
+pi install git:github.com/eiei114/pi-skill-playbook
+```
+
+Or with a full Git URL:
+
+```bash
+pi install git+https://github.com/eiei114/pi-skill-playbook.git
+```
+
+## Install locally
+
+Clone the repository first, then run Pi from the checkout:
+
+```bash
+git clone https://github.com/eiei114/pi-skill-playbook.git
+cd pi-skill-playbook
 npm install
 pi -e .
 ```
@@ -39,7 +54,7 @@ pi -e .
 Or install as a local Pi package:
 
 ```bash
-pi install C:/Users/Keisu/Projects/OSS/pi-skill-playbook
+pi install /path/to/pi-skill-playbook
 ```
 
 ## Add a playbook to a project
@@ -48,7 +63,7 @@ MVP uses manual sample copy:
 
 ```bash
 mkdir -p .pi/playbooks
-cp C:/Users/Keisu/Projects/OSS/pi-skill-playbook/samples/feature-development.yml .pi/playbooks/feature-development.yml
+cp /path/to/pi-skill-playbook/samples/feature-development.yml .pi/playbooks/feature-development.yml
 ```
 
 Add personal run state to the target repo's `.gitignore`:
