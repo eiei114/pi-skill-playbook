@@ -23,7 +23,8 @@
   "scripts": {
     "check": "tsc --noEmit",
     "test": "node --test --import tsx tests/*.test.ts",
-    "build": "npm run check"
+    "build": "npm run check",
+    "validate:package": "npm pack --dry-run"
   },
   "pi": {
     "extensions": ["./extensions/index.ts"]
@@ -38,5 +39,8 @@
   },
   "peerDependencies": {
     "@earendil-works/pi-coding-agent": "*"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }
