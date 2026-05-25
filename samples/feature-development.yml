@@ -1,0 +1,66 @@
+version: 1
+id: feature-development
+name: Feature Development Playbook
+entry: grill
+
+skills:
+  grill-with-docs:
+    role: entry
+  to-prd:
+    role: internal
+  to-issues:
+    role: internal
+  tdd:
+    role: internal
+  review:
+    role: internal
+
+steps:
+  grill:
+    primarySkill: grill-with-docs
+    commandHint: "/skill:grill-with-docs <feature idea>"
+    doneWhen:
+      - Problem boundary is clear.
+      - Key terminology is resolved.
+    transitions:
+      - outcome: ready-for-prd
+        to: prd
+
+  prd:
+    primarySkill: to-prd
+    commandHint: "/skill:to-prd create PRD from resolved design"
+    doneWhen:
+      - PRD exists.
+    transitions:
+      - outcome: ready-for-issues
+        to: issues
+
+  issues:
+    primarySkill: to-issues
+    commandHint: "/skill:to-issues break PRD into implementation issues"
+    doneWhen:
+      - Issues are independently grabbable.
+    transitions:
+      - outcome: ready-for-implementation
+        to: implement
+
+  implement:
+    primarySkill: tdd
+    commandHint: "/skill:tdd implement the next issue"
+    doneWhen:
+      - Tests pass.
+      - Implementation is complete.
+    transitions:
+      - outcome: ready-for-review
+        to: review
+
+  review:
+    primarySkill: review
+    commandHint: "/skill:review review this branch against the plan"
+    doneWhen:
+      - Review result is known.
+    transitions:
+      - outcome: pass
+        to: complete
+      - outcome: fail
+        to: implement
