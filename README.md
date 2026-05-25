@@ -26,7 +26,6 @@ Deferred after scaffold:
 pi install npm:pi-skill-playbook
 ```
 
-Package version: `0.1.1`
 
 ## Install from GitHub
 
