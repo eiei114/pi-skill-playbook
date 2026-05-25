@@ -1,4 +1,5 @@
 export type SkillRole = "entry" | "internal";
+export type AdvanceMode = "auto" | "suggest" | "off";
 
 export interface PlaybookSkillDefinition {
   role: SkillRole;
@@ -21,6 +22,7 @@ export interface PlaybookDefinition {
   id: string;
   name: string;
   entry: string;
+  autoAdvance?: AdvanceMode;
   skills: Record<string, PlaybookSkillDefinition>;
   steps: Record<string, PlaybookStep>;
   sources?: Array<{ url: string; title?: string; accessedAt: string }>;
@@ -43,7 +45,7 @@ export interface PlaybookRunState {
   playbookId: string;
   playbookPath: string;
   currentStep: string;
-  status: "active" | "completed";
+  status: "active" | "completed" | "cancelled";
   createdAt: string;
   updatedAt: string;
   history: PlaybookRunHistoryEntry[];

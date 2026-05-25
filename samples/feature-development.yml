@@ -2,6 +2,7 @@ version: 1
 id: feature-development
 name: Feature Development Playbook
 entry: grill
+autoAdvance: auto
 
 skills:
   grill-with-docs:

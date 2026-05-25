@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { clearActiveRun, createRunId, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
+import { lastAssistantText, parseOutcomeMarker, parseSkillInvocation, planCompletion, renderPlaybookPrompt } from "../src/auto-advance.js";
+import { clearActiveRun, createRunId, listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
 import { findPlaybook, loadPlaybooks } from "../src/playbooks.js";
 import { getGitignoreAdvisory } from "../src/gitignore.js";
 import { renderStepCard, renderValidationErrors } from "../src/render.js";
@@ -9,7 +10,11 @@ import type { LoadedPlaybook, PlaybookRunState } from "../src/types.js";
 const WIDGET_ID = "pi-skill-playbook";
 
 export default function piSkillPlaybook(pi: ExtensionAPI) {
+  let completionCwd = process.cwd();
+  let pendingSkillInvocation: string | undefined;
+
   pi.on("session_start", async (_event, ctx) => {
+    completionCwd = ctx.cwd;
     if (!ctx.hasUI) return;
     const activeRunId = await loadActiveRunId(ctx.cwd);
     if (!activeRunId) {
@@ -17,7 +22,8 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
       return;
     }
     const run = await loadRun(ctx.cwd, activeRunId);
-    if (!run || run.status === "completed") {
+    if (!run || run.status !== "active") {
+      await clearActiveRun(ctx.cwd);
       ctx.ui.setWidget(WIDGET_ID, undefined);
       return;
     }
@@ -31,13 +37,31 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
     ctx.ui.setWidget(WIDGET_ID, renderStepCard(playbook, run), { placement: "belowEditor" });
   });
 
+  pi.on("input", (event) => {
+    if (event.source === "extension") return { action: "continue" };
+    pendingSkillInvocation = parseSkillInvocation(event.text);
+    return { action: "continue" };
+  });
+
+  pi.on("before_agent_start", async (event, ctx) => {
+    const active = await loadActiveIfAvailable(ctx.cwd);
+    if (!active) return;
+    const prompt = renderPlaybookPrompt(active.playbook, active.run);
+    if (!prompt) return;
+    return { systemPrompt: `${event.systemPrompt}\n\n${prompt}` };
+  });
+
+  pi.on("agent_end", async (event, ctx) => {
+    try {
+      await processAgentCompletion(ctx.cwd, pendingSkillInvocation, lastAssistantText(event.messages), ctx.hasUI ? ctx.ui : undefined);
+    } finally {
+      pendingSkillInvocation = undefined;
+    }
+  });
+
   pi.registerCommand("playbook", {
     description: "Guide Agent Skill workflows with project-local playbooks",
-    getArgumentCompletions: (prefix) => {
-      const commands = ["list", "start", "resume", "status", "done", "choose"];
-      const filtered = commands.filter((command) => command.startsWith(prefix.trim()));
-      return filtered.length ? filtered.map((command) => ({ value: command, label: command })) : null;
-    },
+    getArgumentCompletions: (prefix) => getPlaybookArgumentCompletions(completionCwd, prefix),
     handler: async (args, ctx) => {
       const parsed = parseArgs(args);
       const command = parsed.shift() ?? "status";
@@ -61,6 +85,11 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
             return;
           case "choose":
             await chooseOutcome(ctx.cwd, parsed[0], ctx.hasUI ? ctx.ui : undefined);
+            return;
+          case "cancel":
+          case "stop":
+          case "abort":
+            await cancelRun(ctx.cwd, parsed[0], ctx.hasUI ? ctx.ui : undefined);
             return;
           case "import-web":
           case "record":
@@ -131,12 +160,35 @@ async function resumeRun(cwd: string, args: string[], ui: UiLike | undefined): P
   if (!runId) throw new Error("Usage: /playbook resume <run-id>");
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Run '${runId}' not found.`);
-  if (run.status === "completed") throw new Error(`Run '${runId}' is already completed.`);
+  if (run.status !== "active") throw new Error(`Run '${runId}' is ${run.status}.`);
   const playbook = await findPlaybook(cwd, run.playbookId);
   if (!playbook) throw new Error(`Run '${runId}' references missing playbook '${run.playbookId}'.`);
   await setActiveRun(cwd, run.runId);
   renderWidget(ui, playbook, run);
   notify(ui, `Resumed ${run.runId}.`, "info");
+}
+
+async function cancelRun(cwd: string, explicitRunId: string | undefined, ui: UiLike | undefined): Promise<void> {
+  const runId = explicitRunId ?? (await loadActiveRunId(cwd));
+  if (!runId) throw new Error("Usage: /playbook cancel [run-id]");
+  const run = await loadRun(cwd, runId);
+  if (!run) throw new Error(`Run '${runId}' not found.`);
+
+  if (run.status !== "active") {
+    if ((await loadActiveRunId(cwd)) === run.runId) await clearActiveRun(cwd);
+    clearWidget(ui);
+    notify(ui, `Run '${run.runId}' is already ${run.status}.`, "info");
+    return;
+  }
+
+  const now = new Date().toISOString();
+  run.status = "cancelled";
+  run.updatedAt = now;
+  run.history.push({ at: now, step: run.currentStep, outcome: "cancelled", to: "cancelled" });
+  await saveRun(cwd, run);
+  if ((await loadActiveRunId(cwd)) === run.runId) await clearActiveRun(cwd);
+  clearWidget(ui);
+  notify(ui, `Cancelled playbook run ${run.runId}.`, "info");
 }
 
 async function showStatus(cwd: string, explicitRunId: string | undefined, ui: UiLike | undefined): Promise<void> {
@@ -148,6 +200,11 @@ async function showStatus(cwd: string, explicitRunId: string | undefined, ui: Ui
   }
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Run '${runId}' not found.`);
+  if (run.status !== "active") {
+    notify(ui, `Run '${run.runId}' is ${run.status}.`, "info");
+    if (!explicitRunId) clearWidget(ui);
+    return;
+  }
   const playbook = await findPlaybook(cwd, run.playbookId);
   if (!playbook) throw new Error(`Run '${runId}' references missing playbook '${run.playbookId}'.`);
   const lines = renderStepCard(playbook, run);
@@ -210,12 +267,44 @@ async function completeRun(cwd: string, playbook: LoadedPlaybook, run: PlaybookR
   notify(ui, `Advanced to '${to}'.`, "info");
 }
 
+async function processAgentCompletion(cwd: string, invokedSkill: string | undefined, assistantText: string, ui: UiLike | undefined): Promise<void> {
+  const active = await loadActiveIfAvailable(cwd);
+  if (!active) return;
+
+  const marker = parseOutcomeMarker(assistantText);
+  const plan = planCompletion(active.playbook, active.run, invokedSkill, marker);
+  if (!plan) return;
+
+  if (plan.kind === "auto") {
+    await completeRun(cwd, active.playbook, active.run, plan.outcome ?? "complete", plan.to ?? "complete", ui);
+    return;
+  }
+
+  if (plan.kind === "suggest") {
+    renderWidget(ui, active.playbook, active.run, plan.message);
+    notify(ui, plan.message, "info");
+    return;
+  }
+
+  notify(ui, plan.message, plan.kind === "warning" ? "warning" : "info");
+}
+
+async function loadActiveIfAvailable(cwd: string): Promise<{ run: PlaybookRunState; playbook: LoadedPlaybook } | undefined> {
+  const runId = await loadActiveRunId(cwd);
+  if (!runId) return undefined;
+  const run = await loadRun(cwd, runId);
+  if (!run || run.status !== "active") return undefined;
+  const playbook = await findPlaybook(cwd, run.playbookId);
+  if (!playbook) return undefined;
+  return { run, playbook };
+}
+
 async function loadActive(cwd: string): Promise<{ run: PlaybookRunState; playbook: LoadedPlaybook }> {
   const runId = await loadActiveRunId(cwd);
   if (!runId) throw new Error("No active playbook run.");
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Active run '${runId}' not found.`);
-  if (run.status === "completed") throw new Error(`Active run '${runId}' is completed.`);
+  if (run.status !== "active") throw new Error(`Active run '${runId}' is ${run.status}.`);
   const playbook = await findPlaybook(cwd, run.playbookId);
   if (!playbook) throw new Error(`Run '${run.runId}' references missing playbook '${run.playbookId}'.`);
   return { run, playbook };
@@ -228,8 +317,9 @@ function getAvailableSkills(pi: ExtensionAPI): ReadonlySet<string> {
   return new Set(skills);
 }
 
-function renderWidget(ui: UiLike | undefined, playbook: LoadedPlaybook, run: PlaybookRunState): void {
-  ui?.setWidget(WIDGET_ID, renderStepCard(playbook, run), { placement: "belowEditor" });
+function renderWidget(ui: UiLike | undefined, playbook: LoadedPlaybook, run: PlaybookRunState, notice?: string): void {
+  const lines = renderStepCard(playbook, run);
+  ui?.setWidget(WIDGET_ID, notice ? [...lines, "", notice] : lines, { placement: "belowEditor" });
 }
 
 function clearWidget(ui: UiLike | undefined): void {
@@ -249,7 +339,148 @@ function usage(): string {
     "/playbook status [run-id]",
     "/playbook done",
     "/playbook choose <outcome>",
+    "/playbook cancel [run-id]",
   ].join("\n");
+}
+
+type CompletionItem = { value: string; label: string; description?: string };
+
+export async function getPlaybookArgumentCompletions(cwd: string, prefix: string): Promise<CompletionItem[] | null> {
+  try {
+    return await getPlaybookArgumentCompletionsUnsafe(cwd, prefix);
+  } catch {
+    return null;
+  }
+}
+
+async function getPlaybookArgumentCompletionsUnsafe(cwd: string, prefix: string): Promise<CompletionItem[] | null> {
+  const parsed = parseCompletionPrefix(prefix);
+  const command = parsed.command;
+  if (!command) {
+    return completeCommands(parsed.currentToken);
+  }
+
+  if (parsed.completedTokens.length === 0) {
+    return completeCommands(parsed.currentToken);
+  }
+
+  switch (command) {
+    case "start":
+      return completeStartArguments(cwd, parsed);
+    case "resume":
+      return completeRunArgument(cwd, parsed, command, { activeOnly: true });
+    case "status":
+      return completeRunArgument(cwd, parsed, command, { activeOnly: false, optional: true });
+    case "cancel":
+    case "stop":
+    case "abort":
+      return completeRunArgument(cwd, parsed, command, { activeOnly: true, optional: true });
+    case "choose":
+      return completeOutcomeArgument(cwd, parsed);
+    default:
+      return null;
+  }
+}
+
+function completeCommands(token: string): CompletionItem[] | null {
+  const commands = ["list", "start", "resume", "status", "done", "choose", "cancel"];
+  return toCompletionItems(commands, token, (command) => command, (command) => command);
+}
+
+async function completeStartArguments(cwd: string, parsed: CompletionPrefix): Promise<CompletionItem[] | null> {
+  const args = parsed.completedTokens.slice(1);
+  if (args.length === 0) {
+    const playbooks = await loadPlaybooks(cwd);
+    return toCompletionItems(
+      playbooks,
+      parsed.currentToken,
+      (playbook) => `start ${playbook.definition.id}`,
+      (playbook) => playbook.definition.id,
+      (playbook) => playbook.definition.name,
+    );
+  }
+
+  if (args.length >= 1 && !args.includes("--run")) {
+    return toCompletionItems(["--run"], parsed.currentToken, (flag) => `start ${args.join(" ")} ${flag} `, (flag) => flag);
+  }
+  return null;
+}
+
+async function completeRunArgument(
+  cwd: string,
+  parsed: CompletionPrefix,
+  command: string,
+  options: { activeOnly: boolean; optional?: boolean },
+): Promise<CompletionItem[] | null> {
+  const args = parsed.completedTokens.slice(1);
+  if (args.length > 0 || (options.optional && parsed.currentToken === "" && !parsed.trailingWhitespace)) return null;
+  const runs = await getRunCompletionCandidates(cwd, options.activeOnly);
+  return toCompletionItems(
+    runs,
+    parsed.currentToken,
+    (run) => `${command} ${run.runId}`,
+    (run) => run.runId,
+    (run) => `${run.playbookId} (${run.status})`,
+  );
+}
+
+async function completeOutcomeArgument(cwd: string, parsed: CompletionPrefix): Promise<CompletionItem[] | null> {
+  const args = parsed.completedTokens.slice(1);
+  if (args.length > 0) return null;
+  const { run, playbook } = await loadActive(cwd);
+  const step = playbook.definition.steps[run.currentStep];
+  if (!step) return null;
+  return toCompletionItems(
+    step.transitions,
+    parsed.currentToken,
+    (transition) => `choose ${transition.outcome}`,
+    (transition) => transition.outcome,
+    (transition) => `to ${transition.to}`,
+  );
+}
+
+async function getRunCompletionCandidates(cwd: string, activeOnly: boolean): Promise<PlaybookRunState[]> {
+  const ids = await listRunIds(cwd);
+  const runs = (await Promise.all(ids.map((id) => loadRun(cwd, id)))).filter((run): run is PlaybookRunState => Boolean(run));
+  const filtered = activeOnly ? runs.filter((run) => run.status === "active") : runs;
+  return filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+function toCompletionItems<T>(
+  values: T[],
+  token: string,
+  valueFor: (item: T) => string,
+  labelFor: (item: T) => string,
+  descriptionFor?: (item: T) => string | undefined,
+): CompletionItem[] | null {
+  const normalizedToken = token.trim().toLowerCase();
+  const items = values
+    .filter((item) => matchesCompletion(labelFor(item), normalizedToken))
+    .map((item) => {
+      const description = descriptionFor?.(item);
+      return { value: valueFor(item), label: labelFor(item), ...(description ? { description } : {}) };
+    });
+  return items.length > 0 ? items : null;
+}
+
+function matchesCompletion(value: string, token: string): boolean {
+  if (token === "") return true;
+  return value.toLowerCase().includes(token);
+}
+
+type CompletionPrefix = {
+  completedTokens: string[];
+  currentToken: string;
+  command: string | undefined;
+  trailingWhitespace: boolean;
+};
+
+function parseCompletionPrefix(prefix: string): CompletionPrefix {
+  const trailingWhitespace = /\s$/.test(prefix);
+  const tokens = parseArgs(prefix);
+  const completedTokens = trailingWhitespace ? tokens : tokens.slice(0, -1);
+  const currentToken = trailingWhitespace ? "" : tokens.at(-1) ?? "";
+  return { completedTokens, currentToken, command: completedTokens[0] ?? (!trailingWhitespace && tokens.length > 1 ? tokens[0] : undefined), trailingWhitespace };
 }
 
 function parseArgs(args: string): string[] {

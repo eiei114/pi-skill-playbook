@@ -26,6 +26,9 @@ export function validatePlaybook(
   else if (!ID_PATTERN.test(pb.id)) errors.push(`${pathPrefix}id must be lower-kebab-case`);
   if (!isNonEmptyString(pb.name)) errors.push(`${pathPrefix}name is required`);
   if (!isNonEmptyString(pb.entry)) errors.push(`${pathPrefix}entry is required`);
+  if (pb.autoAdvance !== undefined && pb.autoAdvance !== "auto" && pb.autoAdvance !== "suggest" && pb.autoAdvance !== "off") {
+    errors.push(`${pathPrefix}autoAdvance must be 'auto', 'suggest', or 'off'`);
+  }
   if (!isRecord(pb.skills)) errors.push(`${pathPrefix}skills map is required`);
   if (!isRecord(pb.steps)) errors.push(`${pathPrefix}steps map is required`);
 

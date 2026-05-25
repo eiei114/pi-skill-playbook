@@ -38,6 +38,21 @@ test("validates a strict playbook", () => {
   assert.deepEqual(result.errors, []);
 });
 
+test("allows supported autoAdvance modes", () => {
+  for (const mode of ["auto", "suggest", "off"]) {
+    const playbook = parsePlaybookYaml(validYaml.replace("entry: grill", `entry: grill\nautoAdvance: ${mode}`), "feature.yml");
+    const result = validatePlaybook(playbook, new Set(["grill-with-docs", "to-prd"]), { requireSkills: true });
+    assert.equal(result.valid, true);
+  }
+});
+
+test("blocks unsupported autoAdvance modes", () => {
+  const playbook = parsePlaybookYaml(validYaml.replace("entry: grill", "entry: grill\nautoAdvance: always"), "feature.yml");
+  const result = validatePlaybook(playbook);
+  assert.equal(result.valid, false);
+  assert.match(result.errors.join("\n"), /autoAdvance must be/);
+});
+
 test("blocks missing transition targets", () => {
   const playbook = parsePlaybookYaml(validYaml.replace("to: prd", "to: missing"), "feature.yml");
   const result = validatePlaybook(playbook);

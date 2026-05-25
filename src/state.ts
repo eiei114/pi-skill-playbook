@@ -1,4 +1,4 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import type { ActiveRunState, PlaybookRunState } from "./types.js";
 
@@ -29,6 +29,20 @@ export async function loadRun(cwd: string, runId: string): Promise<PlaybookRunSt
     if (isNotFound(error)) return undefined;
     throw error;
   }
+}
+
+export async function listRunIds(cwd: string): Promise<string[]> {
+  let files: string[];
+  try {
+    files = await readdir(runsDir(cwd));
+  } catch (error) {
+    if (isNotFound(error)) return [];
+    throw error;
+  }
+  return files
+    .filter((file) => file.endsWith(".json") && file !== ACTIVE_FILE)
+    .map((file) => file.replace(/\.json$/, ""))
+    .sort();
 }
 
 export async function setActiveRun(cwd: string, runId: string): Promise<void> {
