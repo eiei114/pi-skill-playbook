@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { getPlaybookArgumentCompletions } from "../extensions/index.js";
+import { getPlaybookArgumentCompletions, getPlaybookColonArgumentCompletions } from "../extensions/index.js";
 import { saveRun, setActiveRun } from "../src/state.js";
 import type { PlaybookRunState } from "../src/types.js";
 
@@ -63,6 +63,14 @@ test("completes playbook ids, run ids, outcomes, and --run", async () => {
     assert.deepEqual((await getPlaybookArgumentCompletions(cwd, "status old"))?.map((item) => item.value), ["status old-run-20260524000000"]);
     assert.deepEqual((await getPlaybookArgumentCompletions(cwd, "choose ready"))?.map((item) => item.value), ["choose ready-for-prd"]);
     assert.deepEqual((await getPlaybookArgumentCompletions(cwd, "cancel feature"))?.map((item) => item.value), ["cancel feature-development-20260525123456"]);
+
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "start", "feature"))?.map((item) => item.value), ["feature-development"]);
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "start", "feature-development --"))?.map((item) => item.value), ["feature-development --run "]);
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "start", "feature-development "))?.map((item) => item.value), ["feature-development --run "]);
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "resume", "feature"))?.map((item) => item.value), ["feature-development-20260525123456"]);
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "status", "old"))?.map((item) => item.value), ["old-run-20260524000000"]);
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "choose", "ready"))?.map((item) => item.value), ["ready-for-prd"]);
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "cancel", "feature"))?.map((item) => item.value), ["feature-development-20260525123456"]);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }

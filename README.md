@@ -4,12 +4,12 @@ Pi Skill Playbook is a Pi extension that guides Agent Skill usage flows with vis
 
 MVP scope:
 
-- `/playbook list`
-- `/playbook start <playbook-id> [--run <name>]`
-- `/playbook resume <run-id>`
-- `/playbook status [run-id]`
-- `/playbook done`
-- `/playbook choose <outcome>`
+- `/playbook:list`
+- `/playbook:start <playbook-id> [--run <name>]`
+- `/playbook:resume <run-id>`
+- `/playbook:status [run-id]`
+- `/playbook:done`
+- `/playbook:choose <outcome>`
 - strict YAML validation
 - active run widget below the editor
 - marker-based auto advance for single-outcome steps
@@ -17,8 +17,8 @@ MVP scope:
 
 Deferred after scaffold:
 
-- `/playbook import-web`
-- `/playbook record`
+- `/playbook:import-web`
+- `/playbook:record`
 
 ## Install from npm
 
@@ -74,11 +74,11 @@ Add personal run state to the target repo's `.gitignore`:
 ## Use
 
 ```text
-/playbook list
-/playbook start feature-development --run my-feature
-/playbook done
-/playbook choose pass
-/playbook status
+/playbook:list
+/playbook:start feature-development --run my-feature
+/playbook:done
+/playbook:choose pass
+/playbook:status
 ```
 
 The widget displays the current step, exact skill command, completion criteria, and outcome labels.
@@ -93,12 +93,14 @@ When a user explicitly runs the current step skill with `/skill:<name>`, Pi Skil
 PLAYBOOK_OUTCOME: ready-for-prd
 ```
 
-If the current step has exactly one outcome, a valid marker advances the run automatically. If the step has multiple outcomes, the marker is shown as a suggestion and the user must confirm with `/playbook choose <outcome>`.
+If the current step has exactly one outcome, a valid marker advances the run automatically. If the step has multiple outcomes, the marker is shown as a suggestion and the user must confirm with `/playbook:choose <outcome>`.
+
+Legacy space-separated forms such as `/playbook start` remain available for one release.
 
 Optional playbook setting:
 
 ```yaml
 autoAdvance: auto     # default: marker can advance single-outcome steps
-autoAdvance: suggest  # marker only suggests /playbook done or /playbook choose
+autoAdvance: suggest  # marker only suggests /playbook:done or /playbook:choose
 autoAdvance: off      # no prompt injection or completion detection
 ```

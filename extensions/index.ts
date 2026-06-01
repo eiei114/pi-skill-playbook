@@ -9,6 +9,30 @@ import type { LoadedPlaybook, PlaybookRunState } from "../src/types.js";
 
 const WIDGET_ID = "pi-skill-playbook";
 
+const COMMANDS = [
+  ["list", "list available playbooks"],
+  ["start", "start a playbook run"],
+  ["resume", "resume an active playbook run"],
+  ["status", "show playbook run status"],
+  ["done", "complete the current step"],
+  ["choose", "choose a step outcome"],
+  ["cancel", "cancel an active playbook run"],
+] as const;
+
+const COLON_COMMAND_ALIASES = COMMANDS.map(([command, description]) => ({
+  name: `playbook:${command}`,
+  command,
+  description,
+}));
+
+const COLON_COMPLETION_COMMANDS = new Set(["start", "resume", "status", "cancel", "choose"]);
+
+type CommandContext = {
+  cwd: string;
+  hasUI: boolean;
+  ui?: UiLike;
+};
+
 export default function piSkillPlaybook(pi: ExtensionAPI) {
   let completionCwd = process.cwd();
   let pendingSkillInvocation: string | undefined;
@@ -65,44 +89,70 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
     handler: async (args, ctx) => {
       const parsed = parseArgs(args);
       const command = parsed.shift() ?? "status";
-
       try {
-        switch (command) {
-          case "list":
-            await listPlaybooks(pi, ctx.cwd, ctx.hasUI ? ctx.ui : undefined);
-            return;
-          case "start":
-            await startPlaybook(pi, ctx.cwd, parsed, ctx.hasUI ? ctx.ui : undefined);
-            return;
-          case "resume":
-            await resumeRun(ctx.cwd, parsed, ctx.hasUI ? ctx.ui : undefined);
-            return;
-          case "status":
-            await showStatus(ctx.cwd, parsed[0], ctx.hasUI ? ctx.ui : undefined);
-            return;
-          case "done":
-            await completeCurrentStep(ctx.cwd, ctx.hasUI ? ctx.ui : undefined);
-            return;
-          case "choose":
-            await chooseOutcome(ctx.cwd, parsed[0], ctx.hasUI ? ctx.ui : undefined);
-            return;
-          case "cancel":
-          case "stop":
-          case "abort":
-            await cancelRun(ctx.cwd, parsed[0], ctx.hasUI ? ctx.ui : undefined);
-            return;
-          case "import-web":
-          case "record":
-            notify(ctx.hasUI ? ctx.ui : undefined, `/${command} is deferred after the Core 6 MVP scaffold.` , "warning");
-            return;
-          default:
-            notify(ctx.hasUI ? ctx.ui : undefined, usage(), "error");
-        }
+        await handlePlaybookCommand(pi, command, parsed, ctx);
       } catch (error) {
         notify(ctx.hasUI ? ctx.ui : undefined, error instanceof Error ? error.message : String(error), "error");
       }
     },
   });
+
+  for (const alias of COLON_COMMAND_ALIASES) {
+    pi.registerCommand(alias.name, {
+      description: `Playbook: ${alias.description}. Alias for /playbook ${alias.command}.`,
+      ...(COLON_COMPLETION_COMMANDS.has(alias.command)
+        ? { getArgumentCompletions: (prefix) => getPlaybookColonArgumentCompletions(completionCwd, alias.command, prefix) }
+        : {}),
+      handler: async (args, ctx) => {
+        try {
+          await handlePlaybookCommand(pi, alias.command, parseArgs(args), ctx);
+        } catch (error) {
+          notify(ctx.hasUI ? ctx.ui : undefined, error instanceof Error ? error.message : String(error), "error");
+        }
+      },
+    });
+  }
+}
+
+async function handlePlaybookCommand(
+  pi: ExtensionAPI,
+  command: string,
+  args: string[],
+  ctx: CommandContext,
+): Promise<void> {
+  const ui = ctx.hasUI ? ctx.ui : undefined;
+
+  switch (command) {
+    case "list":
+      await listPlaybooks(pi, ctx.cwd, ui);
+      return;
+    case "start":
+      await startPlaybook(pi, ctx.cwd, args, ui);
+      return;
+    case "resume":
+      await resumeRun(ctx.cwd, args, ui);
+      return;
+    case "status":
+      await showStatus(ctx.cwd, args[0], ui);
+      return;
+    case "done":
+      await completeCurrentStep(ctx.cwd, ui);
+      return;
+    case "choose":
+      await chooseOutcome(ctx.cwd, args[0], ui);
+      return;
+    case "cancel":
+    case "stop":
+    case "abort":
+      await cancelRun(ctx.cwd, args[0], ui);
+      return;
+    case "import-web":
+    case "record":
+      notify(ui, `/playbook:${command} is deferred after the Core 6 MVP scaffold.`, "warning");
+      return;
+    default:
+      notify(ui, usage(), "error");
+  }
 }
 
 async function listPlaybooks(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
@@ -125,7 +175,7 @@ async function listPlaybooks(pi: ExtensionAPI, cwd: string, ui: UiLike | undefin
 
 async function startPlaybook(pi: ExtensionAPI, cwd: string, args: string[], ui: UiLike | undefined): Promise<void> {
   const playbookId = args[0];
-  if (!playbookId) throw new Error("Usage: /playbook start <playbook-id> [--run <name>]");
+  if (!playbookId) throw new Error("Usage: /playbook:start <playbook-id> [--run <name>]");
 
   const playbook = await findPlaybook(cwd, playbookId);
   if (!playbook) throw new Error(`Playbook '${playbookId}' not found in .pi/playbooks/.`);
@@ -157,7 +207,7 @@ async function startPlaybook(pi: ExtensionAPI, cwd: string, args: string[], ui: 
 
 async function resumeRun(cwd: string, args: string[], ui: UiLike | undefined): Promise<void> {
   const runId = args[0];
-  if (!runId) throw new Error("Usage: /playbook resume <run-id>");
+  if (!runId) throw new Error("Usage: /playbook:resume <run-id>");
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Run '${runId}' not found.`);
   if (run.status !== "active") throw new Error(`Run '${runId}' is ${run.status}.`);
@@ -170,7 +220,7 @@ async function resumeRun(cwd: string, args: string[], ui: UiLike | undefined): P
 
 async function cancelRun(cwd: string, explicitRunId: string | undefined, ui: UiLike | undefined): Promise<void> {
   const runId = explicitRunId ?? (await loadActiveRunId(cwd));
-  if (!runId) throw new Error("Usage: /playbook cancel [run-id]");
+  if (!runId) throw new Error("Usage: /playbook:cancel [run-id]");
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Run '${runId}' not found.`);
 
@@ -231,7 +281,7 @@ async function completeCurrentStep(cwd: string, ui: UiLike | undefined): Promise
 }
 
 async function chooseOutcome(cwd: string, outcome: string | undefined, ui: UiLike | undefined): Promise<void> {
-  if (!outcome) throw new Error("Usage: /playbook choose <outcome>");
+  if (!outcome) throw new Error("Usage: /playbook:choose <outcome>");
   const { run, playbook } = await loadActive(cwd);
   await advanceRun(cwd, playbook, run, outcome, ui);
 }
@@ -333,13 +383,14 @@ function notify(ui: UiLike | undefined, message: string, level: "info" | "warnin
 function usage(): string {
   return [
     "Usage:",
-    "/playbook list",
-    "/playbook start <playbook-id> [--run <name>]",
-    "/playbook resume <run-id>",
-    "/playbook status [run-id]",
-    "/playbook done",
-    "/playbook choose <outcome>",
-    "/playbook cancel [run-id]",
+    "/playbook:list",
+    "/playbook:start <playbook-id> [--run <name>]",
+    "/playbook:resume <run-id>",
+    "/playbook:status [run-id]",
+    "/playbook:done",
+    "/playbook:choose <outcome>",
+    "/playbook:cancel [run-id]",
+    "Legacy space-separated /playbook <subcommand> forms remain available for compatibility.",
   ].join("\n");
 }
 
@@ -348,6 +399,26 @@ type CompletionItem = { value: string; label: string; description?: string };
 export async function getPlaybookArgumentCompletions(cwd: string, prefix: string): Promise<CompletionItem[] | null> {
   try {
     return await getPlaybookArgumentCompletionsUnsafe(cwd, prefix);
+  } catch {
+    return null;
+  }
+}
+
+export async function getPlaybookColonArgumentCompletions(
+  cwd: string,
+  command: string,
+  prefix: string,
+): Promise<CompletionItem[] | null> {
+  try {
+    const normalizedPrefix = prefix.trimStart();
+    const legacyPrefix = normalizedPrefix ? `${command} ${normalizedPrefix}` : command;
+    const items = await getPlaybookArgumentCompletionsUnsafe(cwd, legacyPrefix);
+    if (!items) return null;
+    const legacyToken = `${command} `;
+    return items.map((item) => ({
+      ...item,
+      value: item.value.startsWith(legacyToken) ? item.value.slice(legacyToken.length) : item.value,
+    }));
   } catch {
     return null;
   }
