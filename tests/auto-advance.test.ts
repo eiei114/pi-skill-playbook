@@ -70,7 +70,7 @@ test("auto-advances single-outcome steps with matching invocation and marker", (
 test("suggests instead of advancing when marker is missing", () => {
   const plan = planCompletion(playbook(), run(), "grill-with-docs", undefined);
   assert.equal(plan?.kind, "suggest");
-  assert.match(plan?.message ?? "", /Run \/playbook done/);
+  assert.match(plan?.message ?? "", /Run \/playbook:done/);
 });
 
 test("multi-outcome steps require explicit confirmation even with marker", () => {
@@ -79,7 +79,7 @@ test("multi-outcome steps require explicit confirmation even with marker", () =>
     kind: "suggest",
     outcome: "pass",
     to: "complete",
-    message: "Completion marked for step 'review'. Confirm outcome: /playbook choose pass",
+    message: "Completion marked for step 'review'. Confirm outcome: /playbook:choose pass",
   });
 });
 

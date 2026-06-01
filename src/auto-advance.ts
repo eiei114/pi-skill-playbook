@@ -91,7 +91,7 @@ export function planCompletion(
       kind: "suggest",
       outcome: resolved.outcome,
       to: resolved.to,
-      message: `Completion marked for step '${run.currentStep}'. Confirm outcome: /playbook choose ${resolved.outcome}`,
+      message: `Completion marked for step '${run.currentStep}'. Confirm outcome: /playbook:choose ${resolved.outcome}`,
     };
   }
 
@@ -101,8 +101,8 @@ export function planCompletion(
       outcome: resolved.outcome,
       to: resolved.to,
       message: resolved.outcome === "complete"
-        ? `Completion marked for final step '${run.currentStep}'. Run /playbook done to complete.`
-        : `Completion marked for step '${run.currentStep}'. Run /playbook done to advance to '${resolved.to}'.`,
+        ? `Completion marked for final step '${run.currentStep}'. Run /playbook:done to complete.`
+        : `Completion marked for step '${run.currentStep}'. Run /playbook:done to advance to '${resolved.to}'.`,
     };
   }
 
@@ -129,7 +129,7 @@ export function lastAssistantText(messages: unknown[]): string {
 
 function suggestPlan(step: PlaybookStep, stepId: string): CompletionPlan {
   if (step.transitions.length === 0) {
-    return { kind: "suggest", outcome: "complete", to: "complete", message: `Completion suspected for final step '${stepId}'. Run /playbook done to complete.` };
+    return { kind: "suggest", outcome: "complete", to: "complete", message: `Completion suspected for final step '${stepId}'. Run /playbook:done to complete.` };
   }
   if (step.transitions.length === 1) {
     const transition = step.transitions[0]!;
@@ -137,12 +137,12 @@ function suggestPlan(step: PlaybookStep, stepId: string): CompletionPlan {
       kind: "suggest",
       outcome: transition.outcome,
       to: transition.to,
-      message: `Completion suspected for step '${stepId}'. Run /playbook done to advance to '${transition.to}'.`,
+      message: `Completion suspected for step '${stepId}'. Run /playbook:done to advance to '${transition.to}'.`,
     };
   }
   return {
     kind: "suggest",
-    message: `Completion suspected for step '${stepId}'. Choose outcome: ${step.transitions.map((transition) => `/playbook choose ${transition.outcome}`).join(" | ")}`,
+    message: `Completion suspected for step '${stepId}'. Choose outcome: ${step.transitions.map((transition) => `/playbook:choose ${transition.outcome}`).join(" | ")}`,
   };
 }
 
