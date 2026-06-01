@@ -17,8 +17,6 @@ const COMMANDS = [
   ["done", "complete the current step"],
   ["choose", "choose a step outcome"],
   ["cancel", "cancel an active playbook run"],
-  ["import-web", "import a playbook from the web (deferred)"],
-  ["record", "record a playbook session (deferred)"],
 ] as const;
 
 const COLON_COMMAND_ALIASES = COMMANDS.map(([command, description]) => ({
@@ -412,7 +410,7 @@ export async function getPlaybookColonArgumentCompletions(
   prefix: string,
 ): Promise<CompletionItem[] | null> {
   try {
-    const normalizedPrefix = prefix.trim();
+    const normalizedPrefix = prefix.trimStart();
     const legacyPrefix = normalizedPrefix ? `${command} ${normalizedPrefix}` : command;
     const items = await getPlaybookArgumentCompletionsUnsafe(cwd, legacyPrefix);
     if (!items) return null;

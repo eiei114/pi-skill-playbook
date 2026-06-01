@@ -66,6 +66,7 @@ test("completes playbook ids, run ids, outcomes, and --run", async () => {
 
     assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "start", "feature"))?.map((item) => item.value), ["feature-development"]);
     assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "start", "feature-development --"))?.map((item) => item.value), ["feature-development --run "]);
+    assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "start", "feature-development "))?.map((item) => item.value), ["feature-development --run "]);
     assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "resume", "feature"))?.map((item) => item.value), ["feature-development-20260525123456"]);
     assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "status", "old"))?.map((item) => item.value), ["old-run-20260524000000"]);
     assert.deepEqual((await getPlaybookColonArgumentCompletions(cwd, "choose", "ready"))?.map((item) => item.value), ["ready-for-prd"]);
