@@ -3,7 +3,12 @@
   "version": "0.1.5",
   "type": "module",
   "description": "Pi extension for passive, human-mediated Agent Skill playbooks.",
-  "keywords": ["pi-package", "pi-extension", "agent-skills", "playbook"],
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "agent-skills",
+    "playbook"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/eiei114/pi-skill-playbook.git"
@@ -24,10 +29,13 @@
     "check": "tsc --noEmit",
     "test": "node --test --import tsx tests/*.test.ts",
     "build": "npm run check",
-    "validate:package": "npm pack --dry-run"
+    "validate:package": "npm pack --dry-run",
+    "version:check": "node scripts/check-version-bump.mjs"
   },
   "pi": {
-    "extensions": ["./extensions/index.ts"]
+    "extensions": [
+      "./extensions/index.ts"
+    ]
   },
   "dependencies": {
     "yaml": "^2.8.1"
