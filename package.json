@@ -22,9 +22,11 @@
   ],
   "scripts": {
     "check": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx tests/*.test.ts",
     "build": "npm run check",
-    "validate:package": "npm pack --dry-run"
+    "validate:package": "npm pack --dry-run",
+    "ci": "npm run typecheck && npm test && npm run validate:package"
   },
   "pi": {
     "extensions": ["./extensions/index.ts"]
