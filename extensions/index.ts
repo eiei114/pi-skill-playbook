@@ -33,6 +33,11 @@ type CommandContext = {
   ui?: UiLike;
 };
 
+type SelectOption<T> = {
+  label: string;
+  value: T;
+};
+
 export default function piSkillPlaybook(pi: ExtensionAPI) {
   let completionCwd = process.cwd();
   let pendingSkillInvocation: string | undefined;
@@ -114,7 +119,7 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
   }
 }
 
-async function handlePlaybookCommand(
+export async function handlePlaybookCommand(
   pi: ExtensionAPI,
   command: string,
   args: string[],
@@ -175,7 +180,12 @@ async function listPlaybooks(pi: ExtensionAPI, cwd: string, ui: UiLike | undefin
 
 async function startPlaybook(pi: ExtensionAPI, cwd: string, args: string[], ui: UiLike | undefined): Promise<void> {
   const playbookId = args[0];
-  if (!playbookId) throw new Error("Usage: /playbook:start <playbook-id> [--run <name>]");
+  if (!playbookId) {
+    const playbook = await pickPlaybook(pi, cwd, ui);
+    if (!playbook) return;
+    await createAndActivateRun(cwd, playbook, undefined, ui);
+    return;
+  }
 
   const playbook = await findPlaybook(cwd, playbookId);
   if (!playbook) throw new Error(`Playbook '${playbookId}' not found in .pi/playbooks/.`);
@@ -186,6 +196,10 @@ async function startPlaybook(pi: ExtensionAPI, cwd: string, args: string[], ui: 
   }
 
   const runName = readFlagValue(args.slice(1), "--run");
+  await createAndActivateRun(cwd, playbook, runName, ui);
+}
+
+async function createAndActivateRun(cwd: string, playbook: LoadedPlaybook, runName: string | undefined, ui: UiLike | undefined): Promise<void> {
   const now = new Date().toISOString();
   const run: PlaybookRunState = {
     runId: createRunId(playbook.definition.id, runName),
@@ -207,7 +221,12 @@ async function startPlaybook(pi: ExtensionAPI, cwd: string, args: string[], ui: 
 
 async function resumeRun(cwd: string, args: string[], ui: UiLike | undefined): Promise<void> {
   const runId = args[0];
-  if (!runId) throw new Error("Usage: /playbook:resume <run-id>");
+  if (!runId) {
+    const run = await pickActiveRun(cwd, ui, "Resume which playbook run?");
+    if (!run) return;
+    await resumeRun(cwd, [run.runId], ui);
+    return;
+  }
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Run '${runId}' not found.`);
   if (run.status !== "active") throw new Error(`Run '${runId}' is ${run.status}.`);
@@ -219,8 +238,12 @@ async function resumeRun(cwd: string, args: string[], ui: UiLike | undefined): P
 }
 
 async function cancelRun(cwd: string, explicitRunId: string | undefined, ui: UiLike | undefined): Promise<void> {
-  const runId = explicitRunId ?? (await loadActiveRunId(cwd));
-  if (!runId) throw new Error("Usage: /playbook:cancel [run-id]");
+  let runId = explicitRunId;
+  if (!runId) {
+    const run = await pickRunToCancel(cwd, ui);
+    if (!run) return;
+    runId = run.runId;
+  }
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Run '${runId}' not found.`);
 
@@ -281,9 +304,163 @@ async function completeCurrentStep(cwd: string, ui: UiLike | undefined): Promise
 }
 
 async function chooseOutcome(cwd: string, outcome: string | undefined, ui: UiLike | undefined): Promise<void> {
-  if (!outcome) throw new Error("Usage: /playbook:choose <outcome>");
   const { run, playbook } = await loadActive(cwd);
+  if (!outcome) {
+    const selected = await pickOutcome(playbook, run, ui);
+    if (!selected) return;
+    outcome = selected.outcome;
+  }
   await advanceRun(cwd, playbook, run, outcome, ui);
+}
+
+async function pickPlaybook(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<LoadedPlaybook | undefined> {
+  if (!hasSelectionUI(ui)) {
+    notify(ui, "Interactive playbook selection requires the Pi TUI. For scripts, use /playbook:start <playbook-id> [--run <name>].", "error");
+    return undefined;
+  }
+
+  const playbooks = await loadPlaybooks(cwd);
+  if (playbooks.length === 0) {
+    notify(ui, "No playbooks found. Create .pi/playbooks/*.yml or copy samples/feature-development.yml into .pi/playbooks/.", "info");
+    return undefined;
+  }
+
+  const availableSkills = getAvailableSkills(pi);
+  const duplicateErrors = duplicateIdErrors(playbooks);
+  const candidates = playbooks.map((playbook) => {
+    const validation = validatePlaybook(playbook, availableSkills, { requireSkills: true });
+    const errors = [...validation.errors, ...(duplicateErrors.get(playbook) ?? [])];
+    return { playbook, errors, valid: errors.length === 0 };
+  });
+
+  if (candidates.length === 1) {
+    const candidate = candidates[0];
+    if (!candidate.valid) {
+      notify(ui, `Playbook validation failed:\n${renderValidationErrors(candidate.errors)}`, "error");
+      return undefined;
+    }
+    return candidate.playbook;
+  }
+
+  const options = candidates.map((candidate) => ({
+    label: playbookSelectionLabel(candidate.playbook, candidate.errors),
+    value: candidate,
+  }));
+  const selected = await selectByLabel(ui, "Start which playbook?", options);
+  if (!selected) return undefined;
+  if (!selected.valid) {
+    notify(ui, `Playbook validation failed:\n${renderValidationErrors(selected.errors)}`, "error");
+    return undefined;
+  }
+  return selected.playbook;
+}
+
+function playbookSelectionLabel(playbook: LoadedPlaybook, errors: string[]): string {
+  const marker = errors.length === 0 ? "ok" : "invalid";
+  const suffix = errors.length === 0 ? "" : ` — ${errors.join("; ")}`;
+  return `${playbook.definition.id} — ${playbook.definition.name} (${marker})${suffix}`;
+}
+
+function duplicateIdErrors(playbooks: LoadedPlaybook[]): Map<LoadedPlaybook, string[]> {
+  const byId = new Map<string, LoadedPlaybook[]>();
+  for (const playbook of playbooks) {
+    const id = playbook.definition.id;
+    if (!id) continue;
+    byId.set(id, [...(byId.get(id) ?? []), playbook]);
+  }
+
+  const result = new Map<LoadedPlaybook, string[]>();
+  for (const [id, matches] of byId) {
+    if (matches.length < 2) continue;
+    const paths = matches.map((playbook) => playbook.path).join(", ");
+    for (const playbook of matches) result.set(playbook, [`duplicate playbook id '${id}' in ${paths}`]);
+  }
+  return result;
+}
+
+async function pickActiveRun(cwd: string, ui: UiLike | undefined, title: string): Promise<PlaybookRunState | undefined> {
+  if (!hasSelectionUI(ui)) {
+    notify(ui, "Interactive run selection requires the Pi TUI. For scripts, pass the run id explicitly.", "error");
+    return undefined;
+  }
+
+  const runs = await getRunCompletionCandidates(cwd, true);
+  if (runs.length === 0) {
+    clearWidget(ui);
+    notify(ui, "No active playbook runs. Start one with /playbook:start.", "info");
+    return undefined;
+  }
+
+  return selectByLabel(ui, title, runs.map((run) => ({ label: activeRunLabel(run), value: run })));
+}
+
+async function pickRunToCancel(cwd: string, ui: UiLike | undefined): Promise<PlaybookRunState | undefined> {
+  if (!hasConfirmUI(ui)) {
+    notify(ui, "Interactive cancellation requires the Pi TUI. For scripts, use /playbook:cancel <run-id>.", "error");
+    return undefined;
+  }
+
+  const runs = await getRunCompletionCandidates(cwd, true);
+  if (runs.length === 0) {
+    clearWidget(ui);
+    notify(ui, "No active playbook runs to cancel.", "info");
+    return undefined;
+  }
+
+  const run = runs.length === 1
+    ? runs[0]
+    : await selectByLabel(ui, "Cancel which playbook run?", runs.map((candidate) => ({ label: activeRunLabel(candidate), value: candidate })));
+  if (!run) return undefined;
+
+  const confirmed = await ui.confirm("Cancel playbook run?", `${run.runId} (${run.playbookId}) will be marked cancelled.`);
+  if (!confirmed) {
+    notify(ui, "Playbook cancellation skipped.", "info");
+    return undefined;
+  }
+  return run;
+}
+
+function activeRunLabel(run: PlaybookRunState): string {
+  return `${run.runId} — ${run.playbookId} (updated ${run.updatedAt})`;
+}
+
+async function pickOutcome(playbook: LoadedPlaybook, run: PlaybookRunState, ui: UiLike | undefined) {
+  if (!hasSelectionUI(ui)) {
+    notify(ui, "Interactive outcome selection requires the Pi TUI. For scripts, use /playbook:choose <outcome>.", "error");
+    return undefined;
+  }
+
+  const step = playbook.definition.steps[run.currentStep];
+  if (!step) throw new Error(`Current step '${run.currentStep}' is missing.`);
+  if (step.transitions.length === 0) {
+    notify(ui, "Current step has no branch outcomes. Run /playbook:done to complete it.", "info");
+    return undefined;
+  }
+
+  return selectByLabel(
+    ui,
+    `Choose outcome for ${run.currentStep}`,
+    step.transitions.map((transition) => ({ label: `${transition.outcome} → ${transition.to}`, value: transition })),
+  );
+}
+
+async function selectByLabel<T>(
+  ui: { select(title: string, options: string[]): Promise<string | undefined> },
+  title: string,
+  options: SelectOption<T>[],
+): Promise<T | undefined> {
+  const selected = await ui.select(title, options.map((option) => option.label));
+  return options.find((option) => option.label === selected)?.value;
+}
+
+function hasSelectionUI(ui: UiLike | undefined): ui is UiLike & { select: NonNullable<UiLike["select"]> } {
+  return typeof ui?.select === "function";
+}
+
+function hasConfirmUI(
+  ui: UiLike | undefined,
+): ui is UiLike & { select: NonNullable<UiLike["select"]>; confirm: NonNullable<UiLike["confirm"]> } {
+  return hasSelectionUI(ui) && typeof ui.confirm === "function";
 }
 
 async function advanceRun(cwd: string, playbook: LoadedPlaybook, run: PlaybookRunState, outcome: string, ui: UiLike | undefined): Promise<void> {
@@ -384,13 +561,13 @@ function usage(): string {
   return [
     "Usage:",
     "/playbook:list",
-    "/playbook:start <playbook-id> [--run <name>]",
-    "/playbook:resume <run-id>",
+    "/playbook:start",
+    "/playbook:resume",
     "/playbook:status [run-id]",
     "/playbook:done",
-    "/playbook:choose <outcome>",
-    "/playbook:cancel [run-id]",
-    "Legacy space-separated /playbook <subcommand> forms remain available for compatibility.",
+    "/playbook:choose",
+    "/playbook:cancel",
+    "Legacy explicit args remain available for scripts: start <playbook-id> [--run <name>], resume <run-id>, choose <outcome>, cancel <run-id>.",
   ].join("\n");
 }
 
@@ -567,5 +744,7 @@ function readFlagValue(args: string[], flag: string): string | undefined {
 
 interface UiLike {
   notify(message: string, level: "info" | "warning" | "error"): void;
+  select?(title: string, options: string[]): Promise<string | undefined>;
+  confirm?(title: string, message: string): Promise<boolean>;
   setWidget(id: string, content: string[] | undefined, options?: { placement?: "aboveEditor" | "belowEditor" }): void;
 }

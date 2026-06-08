@@ -69,19 +69,21 @@ pi -e .
    .pi/playbook-runs/
    ```
 
-3. **Start a run**:
+3. **Start a run** from the Pi TUI:
 
    ```
    /playbook:list
-   /playbook:start feature-development --run my-feature
+   /playbook:start
    ```
+
+   When more than one playbook exists, Pi shows a selector with validation status for each playbook. The run id is generated automatically.
 
 4. **Drive the workflow**:
 
    ```
    /skill:grill-with-docs <feature idea>
    /playbook:done
-   /playbook:choose ready-for-prd
+   /playbook:choose
    /playbook:status
    ```
 
@@ -92,14 +94,14 @@ The widget displays the current step, exact skill command, completion criteria, 
 | Command | Description |
 |---|---|
 | `/playbook:list` | List available playbooks with validation status |
-| `/playbook:start <id> [--run <name>]` | Start a new playbook run |
-| `/playbook:resume <run-id>` | Resume a paused active run |
+| `/playbook:start` | Select a playbook and start a new run |
+| `/playbook:resume` | Select an active run to resume |
 | `/playbook:status [run-id]` | Show current step and completion criteria |
 | `/playbook:done` | Complete the current step (auto-advances if single outcome) |
-| `/playbook:choose <outcome>` | Choose an outcome for multi-branch steps |
-| `/playbook:cancel [run-id]` | Cancel an active run |
+| `/playbook:choose` | Select an outcome for multi-branch steps |
+| `/playbook:cancel` | Select and confirm an active run cancellation |
 
-Legacy space-separated forms (`/playbook start`) remain available for compatibility.
+Legacy explicit-argument forms (`/playbook:start <id>`, `/playbook:resume <run-id>`, `/playbook:choose <outcome>`, `/playbook:cancel <run-id>`, and space-separated `/playbook start`) remain available for scripts and non-interactive use.
 
 ### Auto advance
 
