@@ -21,7 +21,7 @@ A named result of a completed **Step** that selects the next **Step** or complet
 _Avoid_: Status, result
 
 **Auto Advance**:
-The default behavior where a completed single-outcome **Step** advances without `/playbook done`, while multi-outcome **Steps** still wait for explicit outcome choice.
+The default behavior where a completed single-outcome **Step** advances without `/playbook:done`, while multi-outcome **Steps** still wait for explicit outcome choice.
 _Avoid_: Full automation, auto-run
 
 **Advance Mode**:
@@ -65,14 +65,14 @@ _Avoid_: Soft advance, silent guess
 - An **Outcome Marker** without a matching **Skill Invocation** is ignored for state changes and surfaced as a warning.
 - An **Outcome Marker** names one **Outcome** and can drive **Auto Advance** when valid for the current **Step**.
 - A **Playbook Prompt** is derived from the active **Run** and avoids editing each Agent Skill individually.
-- A **Playbook Prompt** takes effect on the next agent turn after `/playbook start` and does not start Agent Skills automatically.
+- A **Playbook Prompt** takes effect on the next agent turn after `/playbook:start` and does not start Agent Skills automatically.
 - A **Visible Marker** explains why a **Run** advanced and remains available in conversation history.
 - An **Advance Suggestion** never changes **Run** state by itself.
 - **Auto Advance** updates **Run** state and the widget, but never writes the next command into the editor.
 
 ## Example dialogue
 
-> **Dev:** "When the `grill` **Step** finishes, should the **Run** require `/playbook done`?"
+> **Dev:** "When the `grill` **Step** finishes, should the **Run** require `/playbook:done`?"
 > **Domain expert:** "No — **Auto Advance** should move single-outcome **Steps** forward by default, but `review` still needs an explicit **Outcome** like `pass` or `fail`."
 
 ## Flagged ambiguities

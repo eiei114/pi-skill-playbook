@@ -5,7 +5,7 @@ Pi Skill Playbook defaults to marker-based **Auto Advance**: a run may advance a
 ## Considered Options
 
 - Fully automatic advancement after any matching skill invocation: rejected because failed or partial skill runs could silently advance the run.
-- Suggest-only advancement: rejected as too close to the existing `/playbook done` workflow.
+- Suggest-only advancement: rejected as too close to the existing `/playbook:done` workflow.
 - Hidden structured metadata: rejected because visible markers make state changes auditable in conversation history.
 
 ## Consequences

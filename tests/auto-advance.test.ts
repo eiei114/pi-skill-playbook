@@ -79,7 +79,7 @@ test("multi-outcome steps require explicit confirmation even with marker", () =>
     kind: "suggest",
     outcome: "pass",
     to: "complete",
-    message: "Completion marked for step 'review'. Confirm outcome: /playbook:choose pass",
+    message: "Completion marked for step 'review'. Confirm outcome with /playbook:choose.",
   });
 });
 

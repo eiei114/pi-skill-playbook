@@ -68,14 +68,14 @@ class MockUi {
   }
 }
 
-test("/playbook:start with no args selects a valid playbook and auto-generates a run id", async () => {
+test("/playbook:start selects a valid playbook and auto-generates a run id", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-select-start-"));
   try {
     await writePlaybook(cwd, "feature-development.yml", basePlaybookYaml);
     await writePlaybook(cwd, "maintenance.yml", secondPlaybookYaml);
     const ui = new MockUi((_title, options) => options.find((option) => option.startsWith("maintenance —")));
 
-    await handlePlaybookCommand(fakePi as any, "start", [], { cwd, hasUI: true, ui } as any);
+    await handlePlaybookCommand(fakePi as any, "start", { cwd, hasUI: true, ui } as any);
 
     assert.equal(ui.selects.length, 1);
     assert.match(ui.selects[0].title, /Start which playbook/);
@@ -90,7 +90,7 @@ test("/playbook:start with no args selects a valid playbook and auto-generates a
   }
 });
 
-test("/playbook:choose with no args maps the selected label back to its outcome", async () => {
+test("/playbook:choose maps the selected label back to its outcome", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-select-choose-"));
   try {
     await writePlaybook(cwd, "feature-development.yml", basePlaybookYaml);
@@ -99,7 +99,7 @@ test("/playbook:choose with no args maps the selected label back to its outcome"
     await setActiveRun(cwd, run.runId);
     const ui = new MockUi((_title, options) => options.find((option) => option.startsWith("ready-for-prd")));
 
-    await handlePlaybookCommand(fakePi as any, "choose", [], { cwd, hasUI: true, ui } as any);
+    await handlePlaybookCommand(fakePi as any, "choose", { cwd, hasUI: true, ui } as any);
 
     const updated = await loadRun(cwd, run.runId);
     assert.equal(ui.selects.length, 1);
@@ -111,12 +111,12 @@ test("/playbook:choose with no args maps the selected label back to its outcome"
   }
 });
 
-test("no-arg empty states give guidance instead of requiring memorized ids", async () => {
+test("empty states give guidance instead of requiring memorized ids", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-empty-states-"));
   try {
     const ui = new MockUi();
-    await handlePlaybookCommand(fakePi as any, "start", [], { cwd, hasUI: true, ui } as any);
-    await handlePlaybookCommand(fakePi as any, "resume", [], { cwd, hasUI: true, ui } as any);
+    await handlePlaybookCommand(fakePi as any, "start", { cwd, hasUI: true, ui } as any);
+    await handlePlaybookCommand(fakePi as any, "resume", { cwd, hasUI: true, ui } as any);
 
     assert.match(ui.notifications.map((item) => item.message).join("\n"), /No playbooks found/);
     assert.match(ui.notifications.map((item) => item.message).join("\n"), /No active playbook runs/);

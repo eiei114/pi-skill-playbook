@@ -91,7 +91,7 @@ export function planCompletion(
       kind: "suggest",
       outcome: resolved.outcome,
       to: resolved.to,
-      message: `Completion marked for step '${run.currentStep}'. Confirm outcome: /playbook:choose ${resolved.outcome}`,
+      message: `Completion marked for step '${run.currentStep}'. Confirm outcome with /playbook:choose.`,
     };
   }
 
@@ -142,7 +142,7 @@ function suggestPlan(step: PlaybookStep, stepId: string): CompletionPlan {
   }
   return {
     kind: "suggest",
-    message: `Completion suspected for step '${stepId}'. Choose outcome: ${step.transitions.map((transition) => `/playbook:choose ${transition.outcome}`).join(" | ")}`,
+    message: `Completion suspected for step '${stepId}'. Run /playbook:choose to select an outcome.`,
   };
 }
 

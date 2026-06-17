@@ -19,14 +19,6 @@ const COMMANDS = [
   ["cancel", "cancel an active playbook run"],
 ] as const;
 
-const COLON_COMMAND_ALIASES = COMMANDS.map(([command, description]) => ({
-  name: `playbook:${command}`,
-  command,
-  description,
-}));
-
-const COLON_COMPLETION_COMMANDS = new Set(["start", "resume", "status", "cancel", "choose"]);
-
 type CommandContext = {
   cwd: string;
   hasUI: boolean;
@@ -39,11 +31,9 @@ type SelectOption<T> = {
 };
 
 export default function piSkillPlaybook(pi: ExtensionAPI) {
-  let completionCwd = process.cwd();
   let pendingSkillInvocation: string | undefined;
 
   pi.on("session_start", async (_event, ctx) => {
-    completionCwd = ctx.cwd;
     if (!ctx.hasUI) return;
     const activeRunId = await loadActiveRunId(ctx.cwd);
     if (!activeRunId) {
@@ -88,29 +78,12 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
     }
   });
 
-  pi.registerCommand("playbook", {
-    description: "Guide Agent Skill workflows with project-local playbooks",
-    getArgumentCompletions: (prefix) => getPlaybookArgumentCompletions(completionCwd, prefix),
-    handler: async (args, ctx) => {
-      const parsed = parseArgs(args);
-      const command = parsed.shift() ?? "status";
-      try {
-        await handlePlaybookCommand(pi, command, parsed, ctx);
-      } catch (error) {
-        notify(ctx.hasUI ? ctx.ui : undefined, error instanceof Error ? error.message : String(error), "error");
-      }
-    },
-  });
-
-  for (const alias of COLON_COMMAND_ALIASES) {
-    pi.registerCommand(alias.name, {
-      description: `Playbook: ${alias.description}. Alias for /playbook ${alias.command}.`,
-      ...(COLON_COMPLETION_COMMANDS.has(alias.command)
-        ? { getArgumentCompletions: (prefix) => getPlaybookColonArgumentCompletions(completionCwd, alias.command, prefix) }
-        : {}),
-      handler: async (args, ctx) => {
+  for (const [command, description] of COMMANDS) {
+    pi.registerCommand(`playbook:${command}`, {
+      description: `Playbook: ${description}.`,
+      handler: async (_args, ctx) => {
         try {
-          await handlePlaybookCommand(pi, alias.command, parseArgs(args), ctx);
+          await handlePlaybookCommand(pi, command, ctx);
         } catch (error) {
           notify(ctx.hasUI ? ctx.ui : undefined, error instanceof Error ? error.message : String(error), "error");
         }
@@ -122,7 +95,6 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
 export async function handlePlaybookCommand(
   pi: ExtensionAPI,
   command: string,
-  args: string[],
   ctx: CommandContext,
 ): Promise<void> {
   const ui = ctx.hasUI ? ctx.ui : undefined;
@@ -132,24 +104,24 @@ export async function handlePlaybookCommand(
       await listPlaybooks(pi, ctx.cwd, ui);
       return;
     case "start":
-      await startPlaybook(pi, ctx.cwd, args, ui);
+      await startPlaybook(pi, ctx.cwd, ui);
       return;
     case "resume":
-      await resumeRun(ctx.cwd, args, ui);
+      await resumeRun(ctx.cwd, ui);
       return;
     case "status":
-      await showStatus(ctx.cwd, args[0], ui);
+      await showStatus(ctx.cwd, ui);
       return;
     case "done":
       await completeCurrentStep(ctx.cwd, ui);
       return;
     case "choose":
-      await chooseOutcome(ctx.cwd, args[0], ui);
+      await chooseOutcome(ctx.cwd, ui);
       return;
     case "cancel":
     case "stop":
     case "abort":
-      await cancelRun(ctx.cwd, args[0], ui);
+      await cancelRun(ctx.cwd, ui);
       return;
     case "import-web":
     case "record":
@@ -178,25 +150,10 @@ async function listPlaybooks(pi: ExtensionAPI, cwd: string, ui: UiLike | undefin
   notify(ui, lines.join("\n"), duplicateResult.valid ? "info" : "error");
 }
 
-async function startPlaybook(pi: ExtensionAPI, cwd: string, args: string[], ui: UiLike | undefined): Promise<void> {
-  const playbookId = args[0];
-  if (!playbookId) {
-    const playbook = await pickPlaybook(pi, cwd, ui);
-    if (!playbook) return;
-    await createAndActivateRun(cwd, playbook, undefined, ui);
-    return;
-  }
-
-  const playbook = await findPlaybook(cwd, playbookId);
-  if (!playbook) throw new Error(`Playbook '${playbookId}' not found in .pi/playbooks/.`);
-
-  const validation = validatePlaybook(playbook, getAvailableSkills(pi), { requireSkills: true });
-  if (!validation.valid) {
-    throw new Error(`Playbook validation failed:\n${renderValidationErrors(validation.errors)}`);
-  }
-
-  const runName = readFlagValue(args.slice(1), "--run");
-  await createAndActivateRun(cwd, playbook, runName, ui);
+async function startPlaybook(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
+  const playbook = await pickPlaybook(pi, cwd, ui);
+  if (!playbook) return;
+  await createAndActivateRun(cwd, playbook, undefined, ui);
 }
 
 async function createAndActivateRun(cwd: string, playbook: LoadedPlaybook, runName: string | undefined, ui: UiLike | undefined): Promise<void> {
@@ -219,33 +176,20 @@ async function createAndActivateRun(cwd: string, playbook: LoadedPlaybook, runNa
   notify(ui, [`Started ${run.runId}.`, ...(advisory ? ["", advisory] : [])].join("\n"), advisory ? "warning" : "info");
 }
 
-async function resumeRun(cwd: string, args: string[], ui: UiLike | undefined): Promise<void> {
-  const runId = args[0];
-  if (!runId) {
-    const run = await pickActiveRun(cwd, ui, "Resume which playbook run?");
-    if (!run) return;
-    await resumeRun(cwd, [run.runId], ui);
-    return;
-  }
-  const run = await loadRun(cwd, runId);
-  if (!run) throw new Error(`Run '${runId}' not found.`);
-  if (run.status !== "active") throw new Error(`Run '${runId}' is ${run.status}.`);
+async function resumeRun(cwd: string, ui: UiLike | undefined): Promise<void> {
+  const run = await pickActiveRun(cwd, ui, "Resume which playbook run?");
+  if (!run) return;
+
   const playbook = await findPlaybook(cwd, run.playbookId);
-  if (!playbook) throw new Error(`Run '${runId}' references missing playbook '${run.playbookId}'.`);
+  if (!playbook) throw new Error(`Run '${run.runId}' references missing playbook '${run.playbookId}'.`);
   await setActiveRun(cwd, run.runId);
   renderWidget(ui, playbook, run);
   notify(ui, `Resumed ${run.runId}.`, "info");
 }
 
-async function cancelRun(cwd: string, explicitRunId: string | undefined, ui: UiLike | undefined): Promise<void> {
-  let runId = explicitRunId;
-  if (!runId) {
-    const run = await pickRunToCancel(cwd, ui);
-    if (!run) return;
-    runId = run.runId;
-  }
-  const run = await loadRun(cwd, runId);
-  if (!run) throw new Error(`Run '${runId}' not found.`);
+async function cancelRun(cwd: string, ui: UiLike | undefined): Promise<void> {
+  const run = await pickRunToCancel(cwd, ui);
+  if (!run) return;
 
   if (run.status !== "active") {
     if ((await loadActiveRunId(cwd)) === run.runId) await clearActiveRun(cwd);
@@ -264,8 +208,8 @@ async function cancelRun(cwd: string, explicitRunId: string | undefined, ui: UiL
   notify(ui, `Cancelled playbook run ${run.runId}.`, "info");
 }
 
-async function showStatus(cwd: string, explicitRunId: string | undefined, ui: UiLike | undefined): Promise<void> {
-  const runId = explicitRunId ?? (await loadActiveRunId(cwd));
+async function showStatus(cwd: string, ui: UiLike | undefined): Promise<void> {
+  const runId = await loadActiveRunId(cwd);
   if (!runId) {
     notify(ui, "No active playbook run.", "info");
     clearWidget(ui);
@@ -275,7 +219,7 @@ async function showStatus(cwd: string, explicitRunId: string | undefined, ui: Ui
   if (!run) throw new Error(`Run '${runId}' not found.`);
   if (run.status !== "active") {
     notify(ui, `Run '${run.runId}' is ${run.status}.`, "info");
-    if (!explicitRunId) clearWidget(ui);
+    clearWidget(ui);
     return;
   }
   const playbook = await findPlaybook(cwd, run.playbookId);
@@ -303,19 +247,16 @@ async function completeCurrentStep(cwd: string, ui: UiLike | undefined): Promise
   await advanceRun(cwd, playbook, run, step.transitions[0].outcome, ui);
 }
 
-async function chooseOutcome(cwd: string, outcome: string | undefined, ui: UiLike | undefined): Promise<void> {
+async function chooseOutcome(cwd: string, ui: UiLike | undefined): Promise<void> {
   const { run, playbook } = await loadActive(cwd);
-  if (!outcome) {
-    const selected = await pickOutcome(playbook, run, ui);
-    if (!selected) return;
-    outcome = selected.outcome;
-  }
-  await advanceRun(cwd, playbook, run, outcome, ui);
+  const selected = await pickOutcome(playbook, run, ui);
+  if (!selected) return;
+  await advanceRun(cwd, playbook, run, selected.outcome, ui);
 }
 
 async function pickPlaybook(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<LoadedPlaybook | undefined> {
   if (!hasSelectionUI(ui)) {
-    notify(ui, "Interactive playbook selection requires the Pi TUI. For scripts, use /playbook:start <playbook-id> [--run <name>].", "error");
+    notify(ui, "Interactive playbook selection requires the Pi TUI. Run /playbook:start from the command palette.", "error");
     return undefined;
   }
 
@@ -380,11 +321,11 @@ function duplicateIdErrors(playbooks: LoadedPlaybook[]): Map<LoadedPlaybook, str
 
 async function pickActiveRun(cwd: string, ui: UiLike | undefined, title: string): Promise<PlaybookRunState | undefined> {
   if (!hasSelectionUI(ui)) {
-    notify(ui, "Interactive run selection requires the Pi TUI. For scripts, pass the run id explicitly.", "error");
+    notify(ui, "Interactive run selection requires the Pi TUI. Run /playbook:resume from the command palette.", "error");
     return undefined;
   }
 
-  const runs = await getRunCompletionCandidates(cwd, true);
+  const runs = await getActiveRuns(cwd);
   if (runs.length === 0) {
     clearWidget(ui);
     notify(ui, "No active playbook runs. Start one with /playbook:start.", "info");
@@ -396,11 +337,11 @@ async function pickActiveRun(cwd: string, ui: UiLike | undefined, title: string)
 
 async function pickRunToCancel(cwd: string, ui: UiLike | undefined): Promise<PlaybookRunState | undefined> {
   if (!hasConfirmUI(ui)) {
-    notify(ui, "Interactive cancellation requires the Pi TUI. For scripts, use /playbook:cancel <run-id>.", "error");
+    notify(ui, "Interactive cancellation requires the Pi TUI. Run /playbook:cancel from the command palette.", "error");
     return undefined;
   }
 
-  const runs = await getRunCompletionCandidates(cwd, true);
+  const runs = await getActiveRuns(cwd);
   if (runs.length === 0) {
     clearWidget(ui);
     notify(ui, "No active playbook runs to cancel.", "info");
@@ -426,7 +367,7 @@ function activeRunLabel(run: PlaybookRunState): string {
 
 async function pickOutcome(playbook: LoadedPlaybook, run: PlaybookRunState, ui: UiLike | undefined) {
   if (!hasSelectionUI(ui)) {
-    notify(ui, "Interactive outcome selection requires the Pi TUI. For scripts, use /playbook:choose <outcome>.", "error");
+    notify(ui, "Interactive outcome selection requires the Pi TUI. Run /playbook:choose from the command palette.", "error");
     return undefined;
   }
 
@@ -563,183 +504,17 @@ function usage(): string {
     "/playbook:list",
     "/playbook:start",
     "/playbook:resume",
-    "/playbook:status [run-id]",
+    "/playbook:status",
     "/playbook:done",
     "/playbook:choose",
     "/playbook:cancel",
-    "Legacy explicit args remain available for scripts: start <playbook-id> [--run <name>], resume <run-id>, choose <outcome>, cancel <run-id>.",
   ].join("\n");
 }
 
-type CompletionItem = { value: string; label: string; description?: string };
-
-export async function getPlaybookArgumentCompletions(cwd: string, prefix: string): Promise<CompletionItem[] | null> {
-  try {
-    return await getPlaybookArgumentCompletionsUnsafe(cwd, prefix);
-  } catch {
-    return null;
-  }
-}
-
-export async function getPlaybookColonArgumentCompletions(
-  cwd: string,
-  command: string,
-  prefix: string,
-): Promise<CompletionItem[] | null> {
-  try {
-    const normalizedPrefix = prefix.trimStart();
-    const legacyPrefix = normalizedPrefix ? `${command} ${normalizedPrefix}` : command;
-    const items = await getPlaybookArgumentCompletionsUnsafe(cwd, legacyPrefix);
-    if (!items) return null;
-    const legacyToken = `${command} `;
-    return items.map((item) => ({
-      ...item,
-      value: item.value.startsWith(legacyToken) ? item.value.slice(legacyToken.length) : item.value,
-    }));
-  } catch {
-    return null;
-  }
-}
-
-async function getPlaybookArgumentCompletionsUnsafe(cwd: string, prefix: string): Promise<CompletionItem[] | null> {
-  const parsed = parseCompletionPrefix(prefix);
-  const command = parsed.command;
-  if (!command) {
-    return completeCommands(parsed.currentToken);
-  }
-
-  if (parsed.completedTokens.length === 0) {
-    return completeCommands(parsed.currentToken);
-  }
-
-  switch (command) {
-    case "start":
-      return completeStartArguments(cwd, parsed);
-    case "resume":
-      return completeRunArgument(cwd, parsed, command, { activeOnly: true });
-    case "status":
-      return completeRunArgument(cwd, parsed, command, { activeOnly: false, optional: true });
-    case "cancel":
-    case "stop":
-    case "abort":
-      return completeRunArgument(cwd, parsed, command, { activeOnly: true, optional: true });
-    case "choose":
-      return completeOutcomeArgument(cwd, parsed);
-    default:
-      return null;
-  }
-}
-
-function completeCommands(token: string): CompletionItem[] | null {
-  const commands = ["list", "start", "resume", "status", "done", "choose", "cancel"];
-  return toCompletionItems(commands, token, (command) => command, (command) => command);
-}
-
-async function completeStartArguments(cwd: string, parsed: CompletionPrefix): Promise<CompletionItem[] | null> {
-  const args = parsed.completedTokens.slice(1);
-  if (args.length === 0) {
-    const playbooks = await loadPlaybooks(cwd);
-    return toCompletionItems(
-      playbooks,
-      parsed.currentToken,
-      (playbook) => `start ${playbook.definition.id}`,
-      (playbook) => playbook.definition.id,
-      (playbook) => playbook.definition.name,
-    );
-  }
-
-  if (args.length >= 1 && !args.includes("--run")) {
-    return toCompletionItems(["--run"], parsed.currentToken, (flag) => `start ${args.join(" ")} ${flag} `, (flag) => flag);
-  }
-  return null;
-}
-
-async function completeRunArgument(
-  cwd: string,
-  parsed: CompletionPrefix,
-  command: string,
-  options: { activeOnly: boolean; optional?: boolean },
-): Promise<CompletionItem[] | null> {
-  const args = parsed.completedTokens.slice(1);
-  if (args.length > 0 || (options.optional && parsed.currentToken === "" && !parsed.trailingWhitespace)) return null;
-  const runs = await getRunCompletionCandidates(cwd, options.activeOnly);
-  return toCompletionItems(
-    runs,
-    parsed.currentToken,
-    (run) => `${command} ${run.runId}`,
-    (run) => run.runId,
-    (run) => `${run.playbookId} (${run.status})`,
-  );
-}
-
-async function completeOutcomeArgument(cwd: string, parsed: CompletionPrefix): Promise<CompletionItem[] | null> {
-  const args = parsed.completedTokens.slice(1);
-  if (args.length > 0) return null;
-  const { run, playbook } = await loadActive(cwd);
-  const step = playbook.definition.steps[run.currentStep];
-  if (!step) return null;
-  return toCompletionItems(
-    step.transitions,
-    parsed.currentToken,
-    (transition) => `choose ${transition.outcome}`,
-    (transition) => transition.outcome,
-    (transition) => `to ${transition.to}`,
-  );
-}
-
-async function getRunCompletionCandidates(cwd: string, activeOnly: boolean): Promise<PlaybookRunState[]> {
+async function getActiveRuns(cwd: string): Promise<PlaybookRunState[]> {
   const ids = await listRunIds(cwd);
   const runs = (await Promise.all(ids.map((id) => loadRun(cwd, id)))).filter((run): run is PlaybookRunState => Boolean(run));
-  const filtered = activeOnly ? runs.filter((run) => run.status === "active") : runs;
-  return filtered.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
-}
-
-function toCompletionItems<T>(
-  values: T[],
-  token: string,
-  valueFor: (item: T) => string,
-  labelFor: (item: T) => string,
-  descriptionFor?: (item: T) => string | undefined,
-): CompletionItem[] | null {
-  const normalizedToken = token.trim().toLowerCase();
-  const items = values
-    .filter((item) => matchesCompletion(labelFor(item), normalizedToken))
-    .map((item) => {
-      const description = descriptionFor?.(item);
-      return { value: valueFor(item), label: labelFor(item), ...(description ? { description } : {}) };
-    });
-  return items.length > 0 ? items : null;
-}
-
-function matchesCompletion(value: string, token: string): boolean {
-  if (token === "") return true;
-  return value.toLowerCase().includes(token);
-}
-
-type CompletionPrefix = {
-  completedTokens: string[];
-  currentToken: string;
-  command: string | undefined;
-  trailingWhitespace: boolean;
-};
-
-function parseCompletionPrefix(prefix: string): CompletionPrefix {
-  const trailingWhitespace = /\s$/.test(prefix);
-  const tokens = parseArgs(prefix);
-  const completedTokens = trailingWhitespace ? tokens : tokens.slice(0, -1);
-  const currentToken = trailingWhitespace ? "" : tokens.at(-1) ?? "";
-  return { completedTokens, currentToken, command: completedTokens[0] ?? (!trailingWhitespace && tokens.length > 1 ? tokens[0] : undefined), trailingWhitespace };
-}
-
-function parseArgs(args: string): string[] {
-  const matches = args.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g) ?? [];
-  return matches.map((arg) => arg.replace(/^(["'])(.*)\1$/, "$2"));
-}
-
-function readFlagValue(args: string[], flag: string): string | undefined {
-  const index = args.indexOf(flag);
-  if (index === -1) return undefined;
-  return args[index + 1];
+  return runs.filter((run) => run.status === "active").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
 }
 
 interface UiLike {
