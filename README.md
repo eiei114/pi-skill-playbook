@@ -22,7 +22,7 @@ Define ordered skill workflows as YAML playbooks in your project, then drive the
 - **Marker-based auto advance** — Single-outcome steps advance automatically when the assistant emits a visible `PLAYBOOK_OUTCOME:` marker. Multi-outcome steps always require explicit confirmation.
 - **Active run widget** — Displays current step, skill command, completion criteria, and outcome labels below the editor.
 - **Strict YAML validation** — Playbooks are validated on load for structure, transitions, and skill references.
-- **Tab completion** — Commands, playbook IDs, run IDs, outcomes, and flags all support tab completion.
+- **Selection UI** — Playbook, run, and outcome selection use the Pi TUI selector instead of memorized ids.
 - **Local run state** — Run state is stored in `.pi/playbook-runs/` inside the target project, never in git.
 
 ## Install
@@ -96,12 +96,12 @@ The widget displays the current step, exact skill command, completion criteria, 
 | `/playbook:list` | List available playbooks with validation status |
 | `/playbook:start` | Select a playbook and start a new run |
 | `/playbook:resume` | Select an active run to resume |
-| `/playbook:status [run-id]` | Show current step and completion criteria |
+| `/playbook:status` | Show current step and completion criteria |
 | `/playbook:done` | Complete the current step (auto-advances if single outcome) |
 | `/playbook:choose` | Select an outcome for multi-branch steps |
 | `/playbook:cancel` | Select and confirm an active run cancellation |
 
-Legacy explicit-argument forms (`/playbook:start <id>`, `/playbook:resume <run-id>`, `/playbook:choose <outcome>`, `/playbook:cancel <run-id>`, and space-separated `/playbook start`) remain available for scripts and non-interactive use.
+All commands are argument-free. Use the Pi TUI selection UI to pick playbooks, runs, and outcomes.
 
 ### Auto advance
 

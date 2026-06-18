@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.0.0
+
+### Breaking changes
+
+- Removed legacy `/playbook <subcommand>` space-dispatch. Use colon commands only (`/playbook:list`, `/playbook:start`, etc.).
+- Removed explicit-argument forms (`/playbook:start <id>`, `/playbook:resume <run-id>`, `/playbook:choose <outcome>`, `/playbook:cancel <run-id>`). All subcommands are argument-free and use the Pi TUI selection UI on the happy path.
+- Removed tab-completion for playbook IDs, run IDs, outcomes, and `--run` flags.
+
+### Changed
+
+- `playbook:*` commands are now the sole registered command surface.
+- Auto-advance suggestion messages point to `/playbook:choose` without embedding outcome names.
+
 ## 0.1.5
 
 - Rewrote README to align with the Pi OSS minimal-docs policy.
