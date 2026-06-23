@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1
+
+- Added root `SECURITY.md` with vulnerability reporting instructions.
+- Linked README Security section to `SECURITY.md`.
+
 ## 1.0.0
 
 ### Breaking changes
