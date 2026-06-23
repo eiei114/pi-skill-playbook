@@ -182,7 +182,7 @@ Manual dispatch is also available from the Actions tab.
 - Run state is local-only (`.pi/playbook-runs/`). No data leaves the machine.
 - The extension does **not** inject system prompts for skill execution. It only adds a short playbook prompt describing the current step, valid outcomes, and expected marker format.
 - No automatic file edits — the extension warns with a `.gitignore` snippet instead of modifying files.
-- Report vulnerabilities via [GitHub Security Advisories](https://github.com/eiei114/pi-skill-playbook/security/advisories/new).
+- For vulnerability reporting, see [`SECURITY.md`](SECURITY.md).
 
 ## Links
 
