@@ -189,6 +189,7 @@ Manual dispatch is also available from the Actions tab.
 - [npm package](https://www.npmjs.com/package/pi-skill-playbook)
 - [GitHub repository](https://github.com/eiei114/pi-skill-playbook)
 - [Pi coding agent](https://github.com/earendil-works/pi-coding-agent)
+- [Roadmap](ROADMAP.md)
 - [Architecture decisions](docs/adr/)
 
 ## License
