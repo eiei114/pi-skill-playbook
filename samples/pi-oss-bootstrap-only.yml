@@ -1,0 +1,43 @@
+version: 1
+id: pi-oss-bootstrap-only
+name: Pi OSS Bootstrap Only
+entry: bootstrap
+autoAdvance: auto
+
+skills:
+  pi-oss-bootstrap:
+    role: entry
+  to-prd-for-oss:
+    role: internal
+  to-issues-for-oss:
+    role: internal
+
+steps:
+  bootstrap:
+    primarySkill: pi-oss-bootstrap
+    commandHint: "/skill:pi-oss-bootstrap bootstrap a new Pi extension OSS project"
+    doneWhen:
+      - OSS repo exists under Projects/OSS/.
+      - Vault project folder exists under 4_Project/OSS/<project_key>/.
+    transitions:
+      - outcome: ready-for-prd
+        to: prd
+
+  prd:
+    primarySkill: to-prd-for-oss
+    commandHint: "/skill:to-prd-for-oss create PRD in 4_Project/<project>/Docs/"
+    doneWhen:
+      - PRD exists under the target OSS project Docs folder.
+    transitions:
+      - outcome: ready-for-issues
+        to: issues
+
+  issues:
+    primarySkill: to-issues-for-oss
+    commandHint: "/skill:to-issues-for-oss break PRD into tracer-bullet issues"
+    doneWhen:
+      - Issue files exist under 4_Project/<project>/Issues/.
+      - Issues are independently grabbable.
+    transitions:
+      - outcome: complete
+        to: complete

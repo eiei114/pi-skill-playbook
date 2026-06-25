@@ -1,0 +1,22 @@
+version: 1
+id: oss-maintenance-onboard
+name: OSS Maintenance Onboarding
+entry: onboard
+autoAdvance: auto
+
+skills:
+  oss-maintenance-onboarding:
+    role: entry
+
+steps:
+  onboard:
+    primarySkill: oss-maintenance-onboarding
+    commandHint: "/skill:oss-maintenance-onboarding add this OSS target to Multica maintenance"
+    doneWhen:
+      - Target is registered in the vault maintenance control surface.
+      - Live Multica project is created or linked when requested.
+      - Controllers and Autopilot tracking are configured conservatively.
+      - Pilot issue verification notes are captured for the first maintenance slice.
+    transitions:
+      - outcome: complete
+        to: complete
