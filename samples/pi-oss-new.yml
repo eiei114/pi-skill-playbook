@@ -1,0 +1,91 @@
+version: 1
+id: pi-oss-new
+name: Pi OSS New Extension Delivery
+entry: grill
+autoAdvance: auto
+
+skills:
+  grill-with-docs:
+    role: entry
+  to-prd-for-oss:
+    role: internal
+  to-issues-for-oss:
+    role: internal
+  tdd:
+    role: internal
+  review:
+    role: internal
+  pi-extension-pr-verify:
+    role: internal
+  x-release-post:
+    role: internal
+
+steps:
+  grill:
+    primarySkill: grill-with-docs
+    commandHint: "/skill:grill-with-docs <Pi OSS extension idea>"
+    doneWhen:
+      - Problem boundary is clear for the new Pi OSS project.
+      - Key terminology and repo layout are resolved.
+    transitions:
+      - outcome: ready-for-prd
+        to: prd
+
+  prd:
+    primarySkill: to-prd-for-oss
+    commandHint: "/skill:to-prd-for-oss create PRD in 4_Project/<project>/Docs/"
+    doneWhen:
+      - PRD exists under the target OSS project Docs folder.
+    transitions:
+      - outcome: ready-for-issues
+        to: issues
+
+  issues:
+    primarySkill: to-issues-for-oss
+    commandHint: "/skill:to-issues-for-oss break PRD into tracer-bullet issues"
+    doneWhen:
+      - Issue files exist under 4_Project/<project>/Issues/.
+      - Issues are independently grabbable.
+    transitions:
+      - outcome: ready-for-implementation
+        to: implement
+
+  implement:
+    primarySkill: tdd
+    commandHint: "/skill:tdd implement the next OSS issue"
+    doneWhen:
+      - Tests pass.
+      - Implementation is complete for the current slice.
+    transitions:
+      - outcome: ready-for-review
+        to: review
+
+  review:
+    primarySkill: review
+    commandHint: "/skill:review review this branch against the plan"
+    doneWhen:
+      - Standards and spec review results are known.
+    transitions:
+      - outcome: pass
+        to: pr-verify
+      - outcome: fail
+        to: implement
+
+  pr-verify:
+    primarySkill: pi-extension-pr-verify
+    commandHint: "/skill:pi-extension-pr-verify verify the PR locally"
+    doneWhen:
+      - PR worktree is set up and automated checks pass.
+      - Manual Pi TUI verification checklist is complete.
+    transitions:
+      - outcome: ready-for-release
+        to: release-post
+
+  release-post:
+    primarySkill: x-release-post
+    commandHint: "/skill:x-release-post draft X release announcement"
+    doneWhen:
+      - English and Japanese release post drafts are saved.
+    transitions:
+      - outcome: complete
+        to: complete

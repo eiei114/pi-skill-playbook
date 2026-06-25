@@ -117,15 +117,26 @@ PLAYBOOK_OUTCOME: ready-for-prd
 | `suggest` | Marker only suggests `/playbook:done` or `/playbook:choose` |
 | `off` | No prompt injection or completion detection |
 
+## Sample playbooks
+
+| Playbook | File | When to use |
+|---|---|---|
+| Feature Development | `feature-development.yml` | Generic product work with standard `to-prd` / `to-issues` skills. Good default for non-OSS projects. |
+| Pi OSS New Extension Delivery | `pi-oss-new.yml` | Full Pi OSS lane from idea through PR verify and release post. Uses `-for-oss` skills and vault maintenance skills. |
+| Pi OSS Bootstrap Only | `pi-oss-bootstrap-only.yml` | Repo + vault bootstrap, then PRD and issue slicing only. Stops before implementation. |
+| OSS Maintenance Onboarding | `oss-maintenance-onboard.yml` | Add a new OSS target to the Multica maintenance operating model. |
+
+Copy one or more files from `samples/` into `.pi/playbooks/` in the target project. See [`docs/examples.md`](docs/examples.md) for copy-and-start steps.
+
 ## Package contents
 
 ```
 pi-skill-playbook/
 ├── extensions/     Pi extension entry point
 ├── src/            Domain logic: validation, state, rendering, auto-advance
-├── samples/        Example playbooks (feature-development.yml)
+├── samples/        Example playbooks (generic + Pi OSS lane)
 ├── tests/          Node.js test suite
-├── docs/adr/       Architecture decision records
+├── docs/           Examples and architecture decision records
 ├── LICENSE         MIT
 └── README.md
 ```
@@ -155,7 +166,7 @@ steps:
         to: complete        # "complete" ends the run
 ```
 
-See [`samples/feature-development.yml`](samples/feature-development.yml) for a full example.
+See [`samples/feature-development.yml`](samples/feature-development.yml) for a generic example and [`samples/pi-oss-new.yml`](samples/pi-oss-new.yml) for the Pi OSS delivery lane.
 
 ## Development
 

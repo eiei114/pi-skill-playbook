@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.1.0
+
+- Added Pi OSS lane sample playbooks: `pi-oss-new.yml`, `pi-oss-bootstrap-only.yml`, and `oss-maintenance-onboard.yml`.
+- Documented when to use generic vs Pi OSS samples in README and expanded `docs/examples.md` with copy-and-start steps.
+- Added `tests/samples.test.ts` to validate packaged samples against the strict schema and vault skill names.
+
 ## 1.0.1
 
 - Added root `SECURITY.md` with vulnerability reporting instructions.
