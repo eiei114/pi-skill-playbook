@@ -5,6 +5,7 @@ import { findPlaybook, loadPlaybooks } from "../src/playbooks.js";
 import { getGitignoreAdvisory } from "../src/gitignore.js";
 import { renderStepCard, renderValidationErrors } from "../src/render.js";
 import { normalizeSkillCommandName, validatePlaybook, validateUniquePlaybookIds } from "../src/validation.js";
+import { handleRecordCommand, RECORD_COMMANDS, recordUsage } from "../src/record-handlers.js";
 import type { LoadedPlaybook, PlaybookRunState } from "../src/types.js";
 
 const WIDGET_ID = "pi-skill-playbook";
@@ -116,6 +117,30 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
       },
     });
   }
+
+  for (const [command, description] of RECORD_COMMANDS) {
+    pi.registerCommand(`playbook:${command}`, {
+      description: `Playbook: ${description}.`,
+      handler: async (args, ctx) => {
+        try {
+          await handleRecordCommand(pi, command, args, ctx);
+        } catch (error) {
+          notify(ctx.hasUI ? ctx.ui : undefined, error instanceof Error ? error.message : String(error), "error");
+        }
+      },
+    });
+  }
+
+  pi.registerCommand("playbook:record", {
+    description: "Playbook: record an explicit skill flow into a draft.",
+    handler: async (args, ctx) => {
+      try {
+        await handleRecordCommand(pi, "record", args, ctx);
+      } catch (error) {
+        notify(ctx.hasUI ? ctx.ui : undefined, error instanceof Error ? error.message : String(error), "error");
+      }
+    },
+  });
 }
 
 export async function handlePlaybookCommand(
@@ -150,7 +175,6 @@ export async function handlePlaybookCommand(
       await cancelRun(ctx.cwd, ui);
       return;
     case "import-web":
-    case "record":
       notify(ui, `/playbook:${command} is deferred after the Core 6 MVP scaffold.`, "warning");
       return;
     default:
@@ -532,6 +556,8 @@ function usage(): string {
     "/playbook:done",
     "/playbook:choose",
     "/playbook:cancel",
+    "",
+    recordUsage(),
   ].join("\n");
 }
 

@@ -1,5 +1,12 @@
 # Changelog
 
+## 1.2.0
+
+- Implemented `/playbook:record:*` commands for explicit skill-flow recording with start, mark, branch, stop, and status subcommands.
+- Added Recorded Skill Flow → Playbook Draft conversion with preview, strict validation, and confirm-before-save to `.pi/playbooks/`.
+- Added `src/draft-save.ts` as the shared validation gate for recorded (and future imported) drafts.
+- Documented how record complements deferred `/playbook:import-web` in README.
+
 ## 1.1.0
 
 - Added Pi OSS lane sample playbooks: `pi-oss-new.yml`, `pi-oss-bootstrap-only.yml`, and `oss-maintenance-onboard.yml`.

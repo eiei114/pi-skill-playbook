@@ -23,6 +23,7 @@ Define ordered skill workflows as YAML playbooks in your project, then drive the
 - **Active run widget** — Displays current step, skill command, completion criteria, and outcome labels below the editor.
 - **Strict YAML validation** — Playbooks are validated on load for structure, transitions, and skill references.
 - **Selection UI** — Playbook, run, and outcome selection use the Pi TUI selector instead of memorized ids.
+- **Record command** — Capture explicit skill usage with `/playbook:record:*` marks and convert the flow into a validated playbook draft.
 - **Local run state** — Run state is stored in `.pi/playbook-runs/` inside the target project, never in git.
 
 ## Install
@@ -67,6 +68,7 @@ pi -e .
 
    ```gitignore
    .pi/playbook-runs/
+   .pi/playbook-records/
    ```
 
 3. **Start a run** from the Pi TUI:
@@ -100,8 +102,22 @@ The widget displays the current step, exact skill command, completion criteria, 
 | `/playbook:done` | Complete the current step (auto-advances if single outcome) |
 | `/playbook:choose` | Select an outcome for multi-branch steps |
 | `/playbook:cancel` | Select and confirm an active run cancellation |
+| `/playbook:record:start <id> [--name <name>]` | Start recording an explicit skill flow |
+| `/playbook:record:mark [<skill>]` | Mark explicit skill usage (selection UI when omitted) |
+| `/playbook:record:branch <outcome>` | Record a branch outcome label before the next skill mark |
+| `/playbook:record:stop` | Preview, validate, confirm, and save a recorded playbook draft |
+| `/playbook:record:status` | Show the active recording session |
 
-All commands are argument-free. Use the Pi TUI selection UI to pick playbooks, runs, and outcomes.
+All core run commands are argument-free. Record subcommands use explicit marks and optional args as shown above.
+
+### Record vs import-web
+
+| Command | Source | When to use |
+|---|---|---|
+| `/playbook:record:*` | Your own explicit skill usage during day-to-day work | Grow playbooks from internal flows you already run |
+| `/playbook:import-web` | Web search + URLs (deferred) | Import external workflow articles with Required Source Trace |
+
+Record never scrapes session logs or infers skills automatically. Import-web (when implemented) never replaces recording — it complements it for external sources.
 
 ### Auto advance
 
