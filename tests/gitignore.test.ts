@@ -15,6 +15,17 @@ test("isPlaybookRunsGitignored detects common ignore patterns", () => {
   assert.equal(isPlaybookRunsGitignored("node_modules/\n"), false);
 });
 
+test("isPlaybookRunsGitignored respects later negation rules", () => {
+  assert.equal(
+    isPlaybookRunsGitignored(".pi/\n!.pi/playbook-runs/\n"),
+    false,
+  );
+  assert.equal(
+    isPlaybookRunsGitignored("!.pi/playbook-runs/\n.pi/playbook-runs/\n"),
+    true,
+  );
+});
+
 test("getGitignoreAdvisory returns undefined when run state is gitignored", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-gitignore-ignored-"));
   try {
@@ -30,7 +41,7 @@ test("getGitignoreAdvisory returns snippet when run state is not gitignored", as
   try {
     const advisory = await getGitignoreAdvisory(cwd);
     assert.match(advisory ?? "", /Run state is personal/);
-    assert.match(advisory ?? "", new RegExp(GITIGNORE_SNIPPET.replace("/", "\\/")));
+    assert.match(advisory ?? "", new RegExp(GITIGNORE_SNIPPET.replace("/", "\/")));
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
@@ -42,7 +53,18 @@ test("getGitignoreAdvisory returns snippet when .gitignore omits run state", asy
     await writeFile(join(cwd, ".gitignore"), "node_modules/\n", "utf8");
     const advisory = await getGitignoreAdvisory(cwd);
     assert.match(advisory ?? "", /Add this to \.gitignore/);
-    assert.match(advisory ?? "", new RegExp(GITIGNORE_SNIPPET.replace("/", "\\/")));
+    assert.match(advisory ?? "", new RegExp(GITIGNORE_SNIPPET.replace("/", "\/")));
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("getGitignoreAdvisory returns snippet when .pi is ignored but playbook-runs is re-included", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-gitignore-negated-"));
+  try {
+    await writeFile(join(cwd, ".gitignore"), ".pi/\n!.pi/playbook-runs/\n", "utf8");
+    const advisory = await getGitignoreAdvisory(cwd);
+    assert.match(advisory ?? "", /Run state is personal/);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
