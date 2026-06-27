@@ -8,6 +8,32 @@ import { normalizeSkillCommandName, validatePlaybook, validateUniquePlaybookIds 
 import type { LoadedPlaybook, PlaybookRunState } from "../src/types.js";
 
 const WIDGET_ID = "pi-skill-playbook";
+let gitignoreAdvisoryShownThisSession = false;
+
+export function resetGitignoreAdvisorySessionForTest(): void {
+  gitignoreAdvisoryShownThisSession = false;
+}
+
+async function notifyWithGitignoreAdvisory(
+  cwd: string,
+  ui: UiLike | undefined,
+  lines: string[],
+  defaultLevel: "info" | "warning" = "info",
+): Promise<void> {
+  if (gitignoreAdvisoryShownThisSession) {
+    notify(ui, lines.join("\n"), defaultLevel);
+    return;
+  }
+
+  const advisory = await getGitignoreAdvisory(cwd);
+  if (!advisory) {
+    notify(ui, lines.join("\n"), defaultLevel);
+    return;
+  }
+
+  gitignoreAdvisoryShownThisSession = true;
+  notify(ui, [...lines, "", advisory].join("\n"), "warning");
+}
 
 const COMMANDS = [
   ["list", "list available playbooks"],
@@ -172,8 +198,7 @@ async function createAndActivateRun(cwd: string, playbook: LoadedPlaybook, runNa
   await saveRun(cwd, run);
   await setActiveRun(cwd, run.runId);
   renderWidget(ui, playbook, run);
-  const advisory = await getGitignoreAdvisory(cwd);
-  notify(ui, [`Started ${run.runId}.`, ...(advisory ? ["", advisory] : [])].join("\n"), advisory ? "warning" : "info");
+  await notifyWithGitignoreAdvisory(cwd, ui, [`Started ${run.runId}.`]);
 }
 
 async function resumeRun(cwd: string, ui: UiLike | undefined): Promise<void> {
@@ -184,7 +209,7 @@ async function resumeRun(cwd: string, ui: UiLike | undefined): Promise<void> {
   if (!playbook) throw new Error(`Run '${run.runId}' references missing playbook '${run.playbookId}'.`);
   await setActiveRun(cwd, run.runId);
   renderWidget(ui, playbook, run);
-  notify(ui, `Resumed ${run.runId}.`, "info");
+  await notifyWithGitignoreAdvisory(cwd, ui, [`Resumed ${run.runId}.`]);
 }
 
 async function cancelRun(cwd: string, ui: UiLike | undefined): Promise<void> {
@@ -226,8 +251,7 @@ async function showStatus(cwd: string, ui: UiLike | undefined): Promise<void> {
   if (!playbook) throw new Error(`Run '${runId}' references missing playbook '${run.playbookId}'.`);
   const lines = renderStepCard(playbook, run);
   renderWidget(ui, playbook, run);
-  const advisory = await getGitignoreAdvisory(cwd);
-  notify(ui, [...lines, ...(advisory ? ["", advisory] : [])].join("\n"), advisory ? "warning" : "info");
+  await notifyWithGitignoreAdvisory(cwd, ui, lines);
 }
 
 async function completeCurrentStep(cwd: string, ui: UiLike | undefined): Promise<void> {
