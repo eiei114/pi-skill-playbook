@@ -21,26 +21,27 @@ export function createRecordSession(playbookId: string, playbookName: string, no
 }
 
 export function markSkill(session: RecordSession, skillName: string, now = new Date().toISOString()): RecordSession {
-  validateSkillName(skillName);
+  const normalizedSkillName = skillName.trim();
+  validateSkillName(normalizedSkillName);
   const next = cloneSession(session);
 
   if (next.pendingBranch) {
-    const step = createStep(skillName, next.steps);
+    const step = createStep(normalizedSkillName, next.steps);
     next.steps[step.id] = step;
     linkPendingBranch(next, step.id);
     next.entryStepId ??= step.id;
     next.currentStepId = step.id;
-    next.marks.push({ at: now, kind: "skill", skillName });
+    next.marks.push({ at: now, kind: "skill", skillName: normalizedSkillName });
     next.updatedAt = now;
     return next;
   }
 
   if (!next.currentStepId) {
-    const step = createStep(skillName, next.steps);
+    const step = createStep(normalizedSkillName, next.steps);
     next.steps[step.id] = step;
     next.entryStepId = step.id;
     next.currentStepId = step.id;
-    next.marks.push({ at: now, kind: "skill", skillName });
+    next.marks.push({ at: now, kind: "skill", skillName: normalizedSkillName });
     next.updatedAt = now;
     return next;
   }
@@ -214,5 +215,5 @@ function cloneSession(session: RecordSession): RecordSession {
 }
 
 function stamp(now: string): string {
-  return now.replace(/[-:.TZ]/g, "").slice(0, 14);
+  return now.replace(/[-:.TZ]/g, "");
 }

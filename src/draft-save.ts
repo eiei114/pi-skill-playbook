@@ -48,19 +48,30 @@ export async function savePlaybookDraft(
     return false;
   }
 
-  if (ui?.confirm) {
-    const confirmed = await ui.confirm(
-      `Save ${options.sourceLabel} playbook draft?`,
-      `Write ${definition.id}.yml to ${PLAYBOOK_DIR}/ after validation.`,
-    );
-    if (!confirmed) {
-      notify(ui, `${options.sourceLabel} draft save skipped.`, "info");
-      return false;
-    }
+  if (!ui?.confirm) {
+    notify(ui, "Confirmation UI is required before saving a recorded draft.", "error");
+    return false;
+  }
+
+  const confirmed = await ui.confirm(
+    `Save ${options.sourceLabel} playbook draft?`,
+    `Write ${definition.id}.yml to ${PLAYBOOK_DIR}/ after validation.`,
+  );
+  if (!confirmed) {
+    notify(ui, `${options.sourceLabel} draft save skipped.`, "info");
+    return false;
   }
 
   await mkdir(join(cwd, PLAYBOOK_DIR), { recursive: true });
-  await writeFile(targetPath, definitionToYaml(definition), "utf8");
+  try {
+    await writeFile(targetPath, definitionToYaml(definition), { encoding: "utf8", flag: "wx" });
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "EEXIST") {
+      notify(ui, `${options.sourceLabel} draft already exists at ${targetPath}.`, "error");
+      return false;
+    }
+    throw error;
+  }
   notify(ui, `Saved playbook draft to ${targetPath}.`, "info");
   return true;
 }

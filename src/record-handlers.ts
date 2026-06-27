@@ -94,7 +94,11 @@ async function startRecording(tokens: string[], cwd: string, ui: RecordUi | unde
 
   validatePlaybookId(playbookId);
   const nameFlag = tokens.indexOf("--name");
-  const playbookName = nameFlag >= 0 ? tokens[nameFlag + 1] : titleCase(playbookId);
+  const playbookName = nameFlag >= 0 ? tokens.slice(nameFlag + 1).join(" ").trim() : titleCase(playbookId);
+  if (nameFlag >= 0 && !playbookName) {
+    notify(ui, "Display name is required after --name.", "error");
+    return;
+  }
 
   const existing = await loadActiveRecordSession(cwd);
   if (existing) {
@@ -117,6 +121,7 @@ async function markRecordingSkill(
   const session = await requireActiveSession(cwd, ui);
   if (!session) return;
 
+  const availableSkills = getAvailableSkills(pi);
   let skillName = tokens[0];
   if (!skillName) {
     const selected = await pickSkill(pi, ui);
@@ -124,6 +129,10 @@ async function markRecordingSkill(
     skillName = selected;
   } else {
     skillName = normalizeSkillCommandName(skillName);
+    if (!availableSkills.has(skillName)) {
+      notify(ui, `Unknown Agent Skill '${skillName}'.`, "error");
+      return;
+    }
   }
 
   const updated = markSkill(session, skillName);
