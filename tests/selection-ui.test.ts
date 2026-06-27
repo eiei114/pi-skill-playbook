@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { handlePlaybookCommand } from "../extensions/index.js";
+import { handlePlaybookCommand, resetGitignoreAdvisorySessionForTest } from "../extensions/index.js";
+import { GITIGNORE_SNIPPET } from "../src/gitignore.js";
 import { listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
 import type { PlaybookRunState } from "../src/types.js";
 
@@ -111,7 +112,30 @@ test("/playbook:choose maps the selected label back to its outcome", async () =>
   }
 });
 
+test("gitignore advisory is shown once per session across start and status", async () => {
+  resetGitignoreAdvisorySessionForTest();
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-gitignore-session-"));
+  try {
+    await writePlaybook(cwd, "feature-development.yml", basePlaybookYaml);
+    const ui = new MockUi();
+
+    await handlePlaybookCommand(fakePi as any, "start", { cwd, hasUI: true, ui } as any);
+    const afterStart = ui.notifications.map((item) => item.message).join("\n");
+    assert.match(afterStart, /Run state is personal/);
+    assert.match(afterStart, new RegExp(GITIGNORE_SNIPPET.replace("/", "\\/")));
+    assert.equal(ui.notifications.at(-1)?.level, "warning");
+
+    await handlePlaybookCommand(fakePi as any, "status", { cwd, hasUI: true, ui } as any);
+    const allMessages = ui.notifications.map((item) => item.message).join("\n");
+    const advisoryCount = (allMessages.match(/Run state is personal/g) ?? []).length;
+    assert.equal(advisoryCount, 1);
+    assert.equal(ui.notifications.at(-1)?.level, "info");
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
 test("empty states give guidance instead of requiring memorized ids", async () => {
+  resetGitignoreAdvisorySessionForTest();
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-empty-states-"));
   try {
     const ui = new MockUi();
