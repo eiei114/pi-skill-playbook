@@ -3,7 +3,8 @@ import { lastAssistantText, parseOutcomeMarker, parseSkillInvocation, planComple
 import { clearActiveRun, createRunId, listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
 import { findPlaybook, loadPlaybooks } from "../src/playbooks.js";
 import { getGitignoreAdvisory } from "../src/gitignore.js";
-import { renderStepCard, renderValidationErrors } from "../src/render.js";
+import { renderValidationErrors } from "../src/render.js";
+import { buildRunStatusPresentation, notifyLevelForValidation } from "../src/status.js";
 import { normalizeSkillCommandName, validatePlaybook, validateUniquePlaybookIds } from "../src/validation.js";
 import { handleRecordCommand, RECORD_COMMANDS, recordUsage } from "../src/record-handlers.js";
 import type { LoadedPlaybook, PlaybookRunState } from "../src/types.js";
@@ -80,7 +81,8 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
       });
       return;
     }
-    ctx.ui.setWidget(WIDGET_ID, renderStepCard(playbook, run), { placement: "belowEditor" });
+    const presentation = await buildRunStatusPresentation(ctx.cwd, playbook, run, getAvailableSkills(pi));
+    ctx.ui.setWidget(WIDGET_ID, presentation.lines, { placement: "belowEditor" });
   });
 
   pi.on("input", (event) => {
@@ -99,7 +101,7 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
 
   pi.on("agent_end", async (event, ctx) => {
     try {
-      await processAgentCompletion(ctx.cwd, pendingSkillInvocation, lastAssistantText(event.messages), ctx.hasUI ? ctx.ui : undefined);
+      await processAgentCompletion(pi, ctx.cwd, pendingSkillInvocation, lastAssistantText(event.messages), ctx.hasUI ? ctx.ui : undefined);
     } finally {
       pendingSkillInvocation = undefined;
     }
@@ -158,16 +160,16 @@ export async function handlePlaybookCommand(
       await startPlaybook(pi, ctx.cwd, ui);
       return;
     case "resume":
-      await resumeRun(ctx.cwd, ui);
+      await resumeRun(pi, ctx.cwd, ui);
       return;
     case "status":
-      await showStatus(ctx.cwd, ui);
+      await showStatus(pi, ctx.cwd, ui);
       return;
     case "done":
-      await completeCurrentStep(ctx.cwd, ui);
+      await completeCurrentStep(pi, ctx.cwd, ui);
       return;
     case "choose":
-      await chooseOutcome(ctx.cwd, ui);
+      await chooseOutcome(pi, ctx.cwd, ui);
       return;
     case "cancel":
     case "stop":
@@ -203,10 +205,10 @@ async function listPlaybooks(pi: ExtensionAPI, cwd: string, ui: UiLike | undefin
 async function startPlaybook(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
   const playbook = await pickPlaybook(pi, cwd, ui);
   if (!playbook) return;
-  await createAndActivateRun(cwd, playbook, undefined, ui);
+  await createAndActivateRun(pi, cwd, playbook, undefined, ui);
 }
 
-async function createAndActivateRun(cwd: string, playbook: LoadedPlaybook, runName: string | undefined, ui: UiLike | undefined): Promise<void> {
+async function createAndActivateRun(pi: ExtensionAPI, cwd: string, playbook: LoadedPlaybook, runName: string | undefined, ui: UiLike | undefined): Promise<void> {
   const now = new Date().toISOString();
   const run: PlaybookRunState = {
     runId: createRunId(playbook.definition.id, runName),
@@ -221,18 +223,18 @@ async function createAndActivateRun(cwd: string, playbook: LoadedPlaybook, runNa
 
   await saveRun(cwd, run);
   await setActiveRun(cwd, run.runId);
-  renderWidget(ui, playbook, run);
+  await renderWidget(pi, cwd, ui, playbook, run);
   await notifyWithGitignoreAdvisory(cwd, ui, [`Started ${run.runId}.`]);
 }
 
-async function resumeRun(cwd: string, ui: UiLike | undefined): Promise<void> {
+async function resumeRun(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
   const run = await pickActiveRun(cwd, ui, "Resume which playbook run?");
   if (!run) return;
 
   const playbook = await findPlaybook(cwd, run.playbookId);
   if (!playbook) throw new Error(`Run '${run.runId}' references missing playbook '${run.playbookId}'.`);
   await setActiveRun(cwd, run.runId);
-  renderWidget(ui, playbook, run);
+  await renderWidget(pi, cwd, ui, playbook, run);
   await notifyWithGitignoreAdvisory(cwd, ui, [`Resumed ${run.runId}.`]);
 }
 
@@ -257,7 +259,7 @@ async function cancelRun(cwd: string, ui: UiLike | undefined): Promise<void> {
   notify(ui, `Cancelled playbook run ${run.runId}.`, "info");
 }
 
-async function showStatus(cwd: string, ui: UiLike | undefined): Promise<void> {
+async function showStatus(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
   const runId = await loadActiveRunId(cwd);
   if (!runId) {
     notify(ui, "No active playbook run.", "info");
@@ -273,33 +275,37 @@ async function showStatus(cwd: string, ui: UiLike | undefined): Promise<void> {
   }
   const playbook = await findPlaybook(cwd, run.playbookId);
   if (!playbook) throw new Error(`Run '${runId}' references missing playbook '${run.playbookId}'.`);
-  const lines = renderStepCard(playbook, run);
-  renderWidget(ui, playbook, run);
-  await notifyWithGitignoreAdvisory(cwd, ui, lines);
+  const presentation = await buildRunStatusPresentation(cwd, playbook, run, getAvailableSkills(pi));
+  ui?.setWidget(WIDGET_ID, presentation.lines, { placement: "belowEditor" });
+  const notifyLevel = notifyLevelForValidation(presentation.level, false);
+  if (notifyLevel === "error") {
+    notify(ui, presentation.lines.join("\n"), "error");
+    return;
+  }
+  await notifyWithGitignoreAdvisory(cwd, ui, presentation.lines, notifyLevel);
 }
-
-async function completeCurrentStep(cwd: string, ui: UiLike | undefined): Promise<void> {
+async function completeCurrentStep(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
   const { run, playbook } = await loadActive(cwd);
   const step = playbook.definition.steps[run.currentStep];
   if (!step) throw new Error(`Current step '${run.currentStep}' is missing.`);
 
   if (step.transitions.length === 0) {
-    await completeRun(cwd, playbook, run, "complete", "complete", ui);
+    await completeRun(pi, cwd, playbook, run, "complete", "complete", ui);
     return;
   }
   if (step.transitions.length > 1) {
     notify(ui, `Step attested. Choose outcome: ${step.transitions.map((t) => t.outcome).join(", ")}`, "info");
-    renderWidget(ui, playbook, run);
+    await renderWidget(pi, cwd, ui, playbook, run);
     return;
   }
-  await advanceRun(cwd, playbook, run, step.transitions[0].outcome, ui);
+  await advanceRun(pi, cwd, playbook, run, step.transitions[0].outcome, ui);
 }
 
-async function chooseOutcome(cwd: string, ui: UiLike | undefined): Promise<void> {
+async function chooseOutcome(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
   const { run, playbook } = await loadActive(cwd);
   const selected = await pickOutcome(playbook, run, ui);
   if (!selected) return;
-  await advanceRun(cwd, playbook, run, selected.outcome, ui);
+  await advanceRun(pi, cwd, playbook, run, selected.outcome, ui);
 }
 
 async function pickPlaybook(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<LoadedPlaybook | undefined> {
@@ -452,17 +458,17 @@ function hasConfirmUI(
   return hasSelectionUI(ui) && typeof ui.confirm === "function";
 }
 
-async function advanceRun(cwd: string, playbook: LoadedPlaybook, run: PlaybookRunState, outcome: string, ui: UiLike | undefined): Promise<void> {
+async function advanceRun(pi: ExtensionAPI, cwd: string, playbook: LoadedPlaybook, run: PlaybookRunState, outcome: string, ui: UiLike | undefined): Promise<void> {
   const step = playbook.definition.steps[run.currentStep];
   if (!step) throw new Error(`Current step '${run.currentStep}' is missing.`);
   const transition = step.transitions.find((candidate) => candidate.outcome === outcome);
   if (!transition) {
     throw new Error(`Outcome '${outcome}' is not valid for step '${run.currentStep}'. Valid: ${step.transitions.map((t) => t.outcome).join(", ")}`);
   }
-  await completeRun(cwd, playbook, run, transition.outcome, transition.to, ui);
+  await completeRun(pi, cwd, playbook, run, transition.outcome, transition.to, ui);
 }
 
-async function completeRun(cwd: string, playbook: LoadedPlaybook, run: PlaybookRunState, outcome: string, to: string, ui: UiLike | undefined): Promise<void> {
+async function completeRun(pi: ExtensionAPI, cwd: string, playbook: LoadedPlaybook, run: PlaybookRunState, outcome: string, to: string, ui: UiLike | undefined): Promise<void> {
   const now = new Date().toISOString();
   run.history.push({ at: now, step: run.currentStep, outcome, to });
   run.updatedAt = now;
@@ -479,11 +485,11 @@ async function completeRun(cwd: string, playbook: LoadedPlaybook, run: PlaybookR
   run.currentStep = to;
   await saveRun(cwd, run);
   await setActiveRun(cwd, run.runId);
-  renderWidget(ui, playbook, run);
+  await renderWidget(pi, cwd, ui, playbook, run);
   notify(ui, `Advanced to '${to}'.`, "info");
 }
 
-async function processAgentCompletion(cwd: string, invokedSkill: string | undefined, assistantText: string, ui: UiLike | undefined): Promise<void> {
+async function processAgentCompletion(pi: ExtensionAPI, cwd: string, invokedSkill: string | undefined, assistantText: string, ui: UiLike | undefined): Promise<void> {
   const active = await loadActiveIfAvailable(cwd);
   if (!active) return;
 
@@ -492,12 +498,12 @@ async function processAgentCompletion(cwd: string, invokedSkill: string | undefi
   if (!plan) return;
 
   if (plan.kind === "auto") {
-    await completeRun(cwd, active.playbook, active.run, plan.outcome ?? "complete", plan.to ?? "complete", ui);
+    await completeRun(pi, cwd, active.playbook, active.run, plan.outcome ?? "complete", plan.to ?? "complete", ui);
     return;
   }
 
   if (plan.kind === "suggest") {
-    renderWidget(ui, active.playbook, active.run, plan.message);
+    await renderWidget(pi, cwd, ui, active.playbook, active.run, plan.message);
     notify(ui, plan.message, "info");
     return;
   }
@@ -533,9 +539,10 @@ function getAvailableSkills(pi: ExtensionAPI): ReadonlySet<string> {
   return new Set(skills);
 }
 
-function renderWidget(ui: UiLike | undefined, playbook: LoadedPlaybook, run: PlaybookRunState, notice?: string): void {
-  const lines = renderStepCard(playbook, run);
-  ui?.setWidget(WIDGET_ID, notice ? [...lines, "", notice] : lines, { placement: "belowEditor" });
+async function renderWidget(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined, playbook: LoadedPlaybook, run: PlaybookRunState, notice?: string): Promise<void> {
+  const presentation = await buildRunStatusPresentation(cwd, playbook, run, getAvailableSkills(pi));
+  const lines = notice ? [...presentation.lines, "", notice] : presentation.lines;
+  ui?.setWidget(WIDGET_ID, lines, { placement: "belowEditor" });
 }
 
 function clearWidget(ui: UiLike | undefined): void {

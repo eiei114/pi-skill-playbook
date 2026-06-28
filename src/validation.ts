@@ -1,5 +1,5 @@
 import { parse } from "yaml";
-import type { LoadedPlaybook, PlaybookDefinition, ValidationResult } from "./types.js";
+import type { LoadedPlaybook, PlaybookDefinition, PlaybookRunState, ValidationResult } from "./types.js";
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 
@@ -111,6 +111,18 @@ export function validateUniquePlaybookIds(playbooks: LoadedPlaybook[]): Validati
     else seen.set(id, playbook.path);
   }
   return { valid: errors.length === 0, errors, warnings };
+}
+
+export function validateRunState(playbook: LoadedPlaybook | undefined, run: PlaybookRunState): string[] {
+  const errors: string[] = [];
+  if (!playbook) {
+    errors.push(`run '${run.runId}' references missing playbook '${run.playbookId}'`);
+    return errors;
+  }
+  if (run.status === "active" && !(run.currentStep in playbook.definition.steps)) {
+    errors.push(`run '${run.runId}' points to missing step '${run.currentStep}'`);
+  }
+  return errors;
 }
 
 export function normalizeSkillCommandName(name: string): string {
