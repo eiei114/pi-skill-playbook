@@ -1,5 +1,6 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { lastAssistantText, parseOutcomeMarker, parseSkillInvocation, planCompletion, renderPlaybookPrompt } from "../src/auto-advance.js";
+import { formatCompletedRunLine, listCompletedRunSummaries, renderCompletedRunDetail } from "../src/history.js";
 import { clearActiveRun, createRunId, listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
 import { findPlaybook, loadPlaybooks } from "../src/playbooks.js";
 import { getGitignoreAdvisory } from "../src/gitignore.js";
@@ -45,6 +46,7 @@ const COMMANDS = [
   ["done", "complete the current step"],
   ["choose", "choose a step outcome"],
   ["cancel", "cancel an active playbook run"],
+  ["history", "browse completed playbook runs"],
 ] as const;
 
 type CommandContext = {
@@ -171,6 +173,9 @@ export async function handlePlaybookCommand(
     case "choose":
       await chooseOutcome(pi, ctx.cwd, ui);
       return;
+    case "history":
+      await showHistory(ctx.cwd, ui);
+      return;
     case "cancel":
     case "stop":
     case "abort":
@@ -262,7 +267,7 @@ async function cancelRun(cwd: string, ui: UiLike | undefined): Promise<void> {
 async function showStatus(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
   const runId = await loadActiveRunId(cwd);
   if (!runId) {
-    notify(ui, "No active playbook run.", "info");
+    notify(ui, "No active playbook run. Browse finished runs with /playbook:history.", "info");
     clearWidget(ui);
     return;
   }
@@ -284,6 +289,42 @@ async function showStatus(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined)
   }
   await notifyWithGitignoreAdvisory(cwd, ui, presentation.lines, notifyLevel);
 }
+
+async function showHistory(cwd: string, ui: UiLike | undefined): Promise<void> {
+  const summaries = await listCompletedRunSummaries(cwd);
+  if (summaries.length === 0) {
+    notify(
+      ui,
+      [
+        "No completed playbook runs.",
+        "Active runs resume with /playbook:resume; finished runs stay in .pi/playbook-runs/ as read-only history.",
+      ].join("\n"),
+      "info",
+    );
+    return;
+  }
+
+  if (hasSelectionUI(ui) && summaries.length > 1) {
+    const selected = await selectByLabel(
+      ui,
+      "Browse which completed run?",
+      summaries.map((summary) => ({ label: formatCompletedRunLine(summary), value: summary })),
+    );
+    if (!selected) return;
+    notify(ui, renderCompletedRunDetail(selected).join("\n"), "info");
+    return;
+  }
+
+  const lines = [
+    `Completed playbook runs (${summaries.length}):`,
+    ...summaries.map((summary) => formatCompletedRunLine(summary)),
+  ];
+  if (summaries.length === 1) {
+    lines.push("", ...renderCompletedRunDetail(summaries[0]));
+  }
+  notify(ui, lines.join("\n"), "info");
+}
+
 async function completeCurrentStep(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
   const { run, playbook } = await loadActive(cwd);
   const step = playbook.definition.steps[run.currentStep];
@@ -563,6 +604,7 @@ function usage(): string {
     "/playbook:done",
     "/playbook:choose",
     "/playbook:cancel",
+    "/playbook:history",
     "",
     recordUsage(),
   ].join("\n");
