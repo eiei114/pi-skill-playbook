@@ -50,5 +50,6 @@ When multiple playbooks exist, Pi shows a selector with validation status for ea
 - `/playbook:resume` opens an active-run selector.
 - `/playbook:choose` opens a selector for the current step's valid outcomes.
 - `/playbook:cancel` selects an active run when needed and asks for confirmation before marking it cancelled.
+- `/playbook:history` lists completed runs as read-only history. Active runs still resume with `/playbook:resume`.
 
 For Pi OSS samples, run the skill named in the widget's command hint at each step. Single-outcome steps can auto-advance when the assistant emits a visible `PLAYBOOK_OUTCOME:` marker.

@@ -70,6 +70,12 @@ _Avoid_: Soft advance, silent guess
 - An **Advance Suggestion** never changes **Run** state by itself.
 - **Auto Advance** updates **Run** state and the widget, but never writes the next command into the editor.
 
+## Run lifecycle
+
+- **Active runs** are resumable via `/playbook:resume` and drive `/playbook:status`, the widget, and playbook prompts.
+- **Completed runs** remain in `.pi/playbook-runs/` as read-only history. Browse them with `/playbook:history`; they do not resume and do not change active-run behavior.
+- **Cancelled runs** are kept for audit but are excluded from the completed history browser.
+
 ## Example dialogue
 
 > **Dev:** "When the `grill` **Step** finishes, should the **Run** require `/playbook:done`?"
