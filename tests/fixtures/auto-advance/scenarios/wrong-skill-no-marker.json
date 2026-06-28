@@ -1,0 +1,14 @@
+{
+  "id": "wrong-skill-no-marker",
+  "description": "No skill invocation and no marker produces no plan.",
+  "autoAdvance": "auto",
+  "currentStep": "grill",
+  "turn": {
+    "userInput": "what is the next step?",
+    "assistantText": "Run the grill skill when ready."
+  },
+  "expect": {
+    "plan": null,
+    "mutatesState": false
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "id": "off-mode-ignores-turn",
+  "description": "Off mode produces no completion plan even with skill and marker.",
+  "autoAdvance": "off",
+  "currentStep": "grill",
+  "turn": {
+    "userInput": "/skill:grill-with-docs analyze the feature idea",
+    "assistantText": "Problem boundary is clear.\nPLAYBOOK_OUTCOME: ready-for-prd"
+  },
+  "expect": {
+    "plan": null,
+    "mutatesState": false,
+    "prompt": {
+      "absent": true
+    }
+  }
+}

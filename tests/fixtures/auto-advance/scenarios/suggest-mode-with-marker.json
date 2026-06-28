@@ -1,0 +1,19 @@
+{
+  "id": "suggest-mode-with-marker",
+  "description": "Suggest mode records completion but does not auto-advance.",
+  "autoAdvance": "suggest",
+  "currentStep": "grill",
+  "turn": {
+    "userInput": "/skill:grill-with-docs analyze the feature idea",
+    "assistantText": "Problem boundary is clear.\nPLAYBOOK_OUTCOME: ready-for-prd"
+  },
+  "expect": {
+    "plan": {
+      "kind": "suggest",
+      "outcome": "ready-for-prd",
+      "to": "prd",
+      "messageIncludes": "/playbook:done"
+    },
+    "mutatesState": false
+  }
+}

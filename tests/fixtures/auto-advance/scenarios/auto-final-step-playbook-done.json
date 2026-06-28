@@ -1,0 +1,22 @@
+{
+  "id": "auto-final-step-playbook-done",
+  "description": "Final step with no transitions auto-completes on PLAYBOOK_DONE.",
+  "autoAdvance": "auto",
+  "currentStep": "wrap-up",
+  "turn": {
+    "userInput": "/skill:grill-with-docs finalize deliverables",
+    "assistantText": "All deliverables are done.\nPLAYBOOK_DONE"
+  },
+  "expect": {
+    "plan": {
+      "kind": "auto",
+      "outcome": "complete",
+      "to": "complete",
+      "messageIncludes": "Auto-completing"
+    },
+    "mutatesState": true,
+    "prompt": {
+      "includes": ["PLAYBOOK_DONE"]
+    }
+  }
+}

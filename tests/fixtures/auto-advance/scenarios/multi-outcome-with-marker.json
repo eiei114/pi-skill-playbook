@@ -1,0 +1,22 @@
+{
+  "id": "multi-outcome-with-marker",
+  "description": "Multi-outcome steps require explicit confirmation even with a valid marker.",
+  "autoAdvance": "auto",
+  "currentStep": "review",
+  "turn": {
+    "userInput": "/skill:review review this branch",
+    "assistantText": "Review passed.\nPLAYBOOK_OUTCOME: pass"
+  },
+  "expect": {
+    "plan": {
+      "kind": "suggest",
+      "outcome": "pass",
+      "to": "complete",
+      "messageIncludes": "/playbook:choose"
+    },
+    "mutatesState": false,
+    "prompt": {
+      "includes": ["multiple outcomes", "PLAYBOOK_OUTCOME: pass"]
+    }
+  }
+}

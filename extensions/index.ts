@@ -483,6 +483,15 @@ async function completeRun(cwd: string, playbook: LoadedPlaybook, run: PlaybookR
   notify(ui, `Advanced to '${to}'.`, "info");
 }
 
+export async function processAgentCompletionForTest(
+  cwd: string,
+  invokedSkill: string | undefined,
+  assistantText: string,
+  ui: UiLike | undefined,
+): Promise<void> {
+  return processAgentCompletion(cwd, invokedSkill, assistantText, ui);
+}
+
 async function processAgentCompletion(cwd: string, invokedSkill: string | undefined, assistantText: string, ui: UiLike | undefined): Promise<void> {
   const active = await loadActiveIfAvailable(cwd);
   if (!active) return;
