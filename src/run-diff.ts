@@ -2,18 +2,29 @@ import { listCompletedRuns, summarizeCompletedRun, finalOutcome } from "./histor
 import { loadRun } from "./state.js";
 import type { PlaybookRunHistoryEntry, PlaybookRunState } from "./types.js";
 
+/** One side of a run-diff comparison: metadata and history for a completed run. */
 export interface RunDiffEntry {
+  /** Run identifier. */
   runId: string;
+  /** Human-readable playbook name. */
   playbookName: string;
+  /** ISO timestamp of when the run completed. */
   completedAt: string;
+  /** Final outcome label (e.g. "complete", "cancelled"). */
   finalOutcome: string;
+  /** Number of history entries (completed steps). */
   stepCount: number;
+  /** Full step-by-step history of the run. */
   history: PlaybookRunHistoryEntry[];
 }
 
+/** Result of comparing two completed playbook runs. */
 export interface RunDiffResult {
+  /** The more recent run. */
   newer: RunDiffEntry;
+  /** The older run. */
   older: RunDiffEntry;
+  /** Human-readable change descriptions. */
   changes: string[];
 }
 
@@ -148,6 +159,10 @@ export async function loadRecentRunDiffs(cwd: string, count?: number): Promise<R
   return results;
 }
 
+/**
+ * Load a completed run from disk and convert it into a RunDiffEntry.
+ * Returns undefined if the run is not completed or data is missing.
+ */
 async function toRunDiffEntryFromRun(cwd: string, run: PlaybookRunState): Promise<RunDiffEntry | undefined> {
   const summary = await summarizeCompletedRun(cwd, run);
   return toRunDiffEntry(run, summary.playbookName);

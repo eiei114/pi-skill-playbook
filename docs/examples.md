@@ -74,7 +74,7 @@ Run diff: oss-delivery-20260630-v2 vs oss-delivery-20260629-v1
   Newer: Pi OSS New Delivery (2026-06-30T14:00:00.000Z) — fail
   Older: Pi OSS New Delivery (2026-06-29T10:00:00.000Z) — pass
 Changes:
-  Step 5 outcome differs: outcome "fail" was "pass"
+  Step 5 differs: outcome "fail" was "pass"
   Final outcome changed: "fail" (was "pass")
 ```
 
