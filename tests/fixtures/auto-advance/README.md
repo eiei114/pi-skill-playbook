@@ -8,7 +8,7 @@ Run the suite with `npm test` (`tests/auto-advance-fixtures.test.ts`).
 
 ## Layout
 
-```
+```text
 tests/fixtures/auto-advance/
   README.md           # this file
   playbook.json       # shared playbook definition for all scenarios
@@ -75,9 +75,9 @@ The test runner loads every `scenarios/*.json` file automatically.
 
 ### `expect.mutatesState`
 
-`true` only when Auto Advance should change run state (single-outcome `auto`
-plan). Invalid markers, wrong-skill warnings, `suggest` plans, and `off` mode
-must use `false`.
+`true` when Auto Advance should change run state: single-outcome `auto` plans
+and final-step completion (`plan.to === "complete"`). Invalid markers,
+wrong-skill warnings, `suggest` plans, and `off` mode must use `false`.
 
 ## Covered cases (baseline)
 

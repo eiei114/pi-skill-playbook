@@ -93,8 +93,17 @@ for (const scenario of mutationScenarios) {
         assert.equal(after!.history.length, run.history.length + 1);
         assert.equal(await loadActiveRunId(cwd), undefined);
       } else {
-        assert.notEqual(after!.currentStep, run.currentStep, `${scenario.id}: currentStep should advance`);
+        assert.equal(
+          after!.currentStep,
+          scenario.expect.plan?.to,
+          `${scenario.id}: currentStep should match expected plan.to`,
+        );
         assert.equal(after!.history.length, run.history.length + 1);
+        assert.equal(
+          await loadActiveRunId(cwd),
+          run.runId,
+          `${scenario.id}: active run must remain unchanged`,
+        );
       }
     } finally {
       await rm(cwd, { recursive: true, force: true });
