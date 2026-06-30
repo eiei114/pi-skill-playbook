@@ -1,0 +1,42 @@
+{
+  "path": "tests/fixtures/auto-advance/playbook.json",
+  "definition": {
+    "version": 1,
+    "id": "fixture-playbook",
+    "name": "Auto Advance Fixture Playbook",
+    "entry": "grill",
+    "skills": {
+      "grill-with-docs": { "role": "entry" },
+      "review": { "role": "internal" }
+    },
+    "steps": {
+      "grill": {
+        "primarySkill": "grill-with-docs",
+        "commandHint": "/skill:grill-with-docs <feature idea>",
+        "doneWhen": ["Problem boundary is clear."],
+        "transitions": [{ "outcome": "ready-for-prd", "to": "prd" }]
+      },
+      "prd": {
+        "primarySkill": "grill-with-docs",
+        "commandHint": "/skill:grill-with-docs refine PRD",
+        "doneWhen": ["PRD exists."],
+        "transitions": [{ "outcome": "ready", "to": "review" }]
+      },
+      "review": {
+        "primarySkill": "review",
+        "commandHint": "/skill:review review this branch",
+        "doneWhen": ["Review result is known."],
+        "transitions": [
+          { "outcome": "pass", "to": "complete" },
+          { "outcome": "fail", "to": "grill" }
+        ]
+      },
+      "wrap-up": {
+        "primarySkill": "grill-with-docs",
+        "commandHint": "/skill:grill-with-docs finalize",
+        "doneWhen": ["All deliverables are done."],
+        "transitions": []
+      }
+    }
+  }
+}

@@ -589,6 +589,22 @@ async function processAgentCompletion(pi: ExtensionAPI, cwd: string, invokedSkil
   notify(ui, plan.message, plan.kind === "warning" ? "warning" : "info");
 }
 
+const AUTO_ADVANCE_TEST_PI = {
+  getCommands: () => [
+    { source: "skill", name: "skill:grill-with-docs" },
+    { source: "skill", name: "skill:review" },
+  ],
+} as unknown as ExtensionAPI;
+
+export async function processAgentCompletionForTest(
+  cwd: string,
+  invokedSkill: string | undefined,
+  assistantText: string,
+  ui: UiLike | undefined,
+): Promise<void> {
+  return processAgentCompletion(AUTO_ADVANCE_TEST_PI, cwd, invokedSkill, assistantText, ui);
+}
+
 async function loadActiveIfAvailable(cwd: string): Promise<{ run: PlaybookRunState; playbook: LoadedPlaybook } | undefined> {
   const runId = await loadActiveRunId(cwd);
   if (!runId) return undefined;

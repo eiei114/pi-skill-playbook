@@ -1,0 +1,19 @@
+{
+  "id": "missing-marker-suggest-only",
+  "description": "Markerless completion after skill invocation only suggests advancement.",
+  "autoAdvance": "auto",
+  "currentStep": "grill",
+  "turn": {
+    "userInput": "/skill:grill-with-docs analyze the feature idea",
+    "assistantText": "Problem boundary is clear but I forgot the marker."
+  },
+  "expect": {
+    "plan": {
+      "kind": "suggest",
+      "outcome": "ready-for-prd",
+      "to": "prd",
+      "messageIncludes": "/playbook:done"
+    },
+    "mutatesState": false
+  }
+}

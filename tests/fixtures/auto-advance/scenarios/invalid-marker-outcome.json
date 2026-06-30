@@ -1,0 +1,17 @@
+{
+  "id": "invalid-marker-outcome",
+  "description": "Unknown outcome marker is rejected with a warning.",
+  "autoAdvance": "auto",
+  "currentStep": "grill",
+  "turn": {
+    "userInput": "/skill:grill-with-docs analyze the feature idea",
+    "assistantText": "Done.\nPLAYBOOK_OUTCOME: unknown-outcome"
+  },
+  "expect": {
+    "plan": {
+      "kind": "warning",
+      "messageIncludes": "Ignored invalid playbook marker"
+    },
+    "mutatesState": false
+  }
+}

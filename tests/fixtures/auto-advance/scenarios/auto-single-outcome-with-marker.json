@@ -1,0 +1,22 @@
+{
+  "id": "auto-single-outcome-with-marker",
+  "description": "Single-outcome step auto-advances when skill is invoked and marker matches.",
+  "autoAdvance": "auto",
+  "currentStep": "grill",
+  "turn": {
+    "userInput": "/skill:grill-with-docs analyze the feature idea",
+    "assistantText": "Problem boundary is clear.\nPLAYBOOK_OUTCOME: ready-for-prd"
+  },
+  "expect": {
+    "plan": {
+      "kind": "auto",
+      "outcome": "ready-for-prd",
+      "to": "prd",
+      "messageIncludes": "Auto-advancing"
+    },
+    "mutatesState": true,
+    "prompt": {
+      "includes": ["PLAYBOOK_OUTCOME: ready-for-prd", "grill-with-docs"]
+    }
+  }
+}

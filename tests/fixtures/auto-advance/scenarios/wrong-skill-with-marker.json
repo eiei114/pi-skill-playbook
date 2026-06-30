@@ -1,0 +1,17 @@
+{
+  "id": "wrong-skill-with-marker",
+  "description": "Marker is ignored when the active step skill was not invoked.",
+  "autoAdvance": "auto",
+  "currentStep": "grill",
+  "turn": {
+    "userInput": "please summarize the feature",
+    "assistantText": "Done.\nPLAYBOOK_OUTCOME: ready-for-prd"
+  },
+  "expect": {
+    "plan": {
+      "kind": "warning",
+      "messageIncludes": "skill was not invoked"
+    },
+    "mutatesState": false
+  }
+}
