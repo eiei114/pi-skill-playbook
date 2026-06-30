@@ -1,5 +1,18 @@
 # Changelog
 
+## 1.4.0
+
+- Added `/playbook:rundiff` to compare recent completed playbook runs with a compact diff view.
+- The diff highlights meaningful changes: different playbooks, step sequences, outcomes, and extra/missing steps.
+- Handles edge cases: identical runs (shows "All steps match"), changed runs (per-step diff), and insufficient runs (guidance to complete more runs).
+- Documented rundiff usage, a regression/debugging example, and `rundiff vs history` comparison in `docs/examples.md`.
+
+## 1.3.0
+
+- Added `/playbook:history` to browse completed runs with compact metadata (playbook name, run id, finished time, final outcome).
+- `/playbook:status` now points to history when no active run is loaded.
+- Documented active vs completed run lifecycle in README, `docs/examples.md`, and `CONTEXT.md`.
+
 ## 1.2.0
 
 - Implemented `/playbook:record:*` commands for explicit skill-flow recording with start, mark, branch, stop, and status subcommands.

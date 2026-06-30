@@ -102,6 +102,8 @@ The widget displays the current step, exact skill command, completion criteria, 
 | `/playbook:done` | Complete the current step (auto-advances if single outcome) |
 | `/playbook:choose` | Select an outcome for multi-branch steps |
 | `/playbook:cancel` | Select and confirm an active run cancellation |
+| `/playbook:history` | Browse completed runs (read-only; active runs use `/playbook:resume`) |
+| `/playbook:rundiff` | Compare recent completed runs with a compact diff summary |
 | `/playbook:record:start <id> [--name <name>]` | Start recording an explicit skill flow |
 | `/playbook:record:mark [<skill>]` | Mark explicit skill usage (selection UI when omitted) |
 | `/playbook:record:branch <outcome>` | Record a branch outcome label before the next skill mark |
@@ -109,6 +111,16 @@ The widget displays the current step, exact skill command, completion criteria, 
 | `/playbook:record:status` | Show the active recording session |
 
 All core run commands are argument-free. Record subcommands use explicit marks and optional args as shown above.
+
+### Run lifecycle
+
+| State | Stored in | Resume? | Browse with |
+| --- | --- | --- | --- |
+| Active | `.pi/playbook-runs/<run-id>.json` + `active.json` | Yes — `/playbook:resume` | `/playbook:status` while active |
+| Completed | `.pi/playbook-runs/<run-id>.json` (history kept) | No — read-only | `/playbook:history` |
+| Cancelled | same file, `status: cancelled` | No | not listed in history |
+
+Finished runs stay on disk for reference; `/playbook:history` lists compact metadata (playbook name, run id, finished time, final outcome).
 
 ### Record vs import-web
 
