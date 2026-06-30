@@ -53,3 +53,38 @@ When multiple playbooks exist, Pi shows a selector with validation status for ea
 - `/playbook:history` lists completed runs as read-only history. Active runs still resume with `/playbook:resume`.
 
 For Pi OSS samples, run the skill named in the widget's command hint at each step. Single-outcome steps can auto-advance when the assistant emits a visible `PLAYBOOK_OUTCOME:` marker.
+
+## Compare recent playbook runs
+
+After multiple completed runs, compare the two most recent runs with `/playbook:rundiff`:
+
+```text
+/playbook:rundiff
+```
+
+Output shows a compact diff: newer vs older run, playbook name, final outcome, and per-step differences.
+
+### Regression/debugging example
+
+After a CI rebuild in a Pi OSS delivery, the `review` step previously passed but now fails:
+
+```text
+> /playbook:rundiff
+Run diff: oss-delivery-20260630-v2 vs oss-delivery-20260629-v1
+  Newer: Pi OSS New Delivery (2026-06-30T14:00:00.000Z) — fail
+  Older: Pi OSS New Delivery (2026-06-29T10:00:00.000Z) — pass
+Changes:
+  Step 5 outcome differs: outcome "fail" was "pass"
+  Final outcome changed: "fail" (was "pass")
+```
+
+The compact diff surfaces the regression immediately — the reviewer can focus on the `review` step's test evidence without digging through raw run files.
+
+### When to use rundiff vs history
+
+| Use case | Command |
+| --- | --- |
+| Browsing all completed runs (metadata) | `/playbook:history` |
+| Comparing two recent run outputs | `/playbook:rundiff` |
+| Drilling into one run's detail | `/playbook:history` then select a run |
+| Checking active run status | `/playbook:status` |

@@ -1,6 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { lastAssistantText, parseOutcomeMarker, parseSkillInvocation, planCompletion, renderPlaybookPrompt } from "../src/auto-advance.js";
 import { formatCompletedRunLine, listCompletedRunSummaries, renderCompletedRunDetail } from "../src/history.js";
+import { formatRunDiff, loadRecentRunDiffs } from "../src/run-diff.js";
 import { clearActiveRun, createRunId, listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
 import { findPlaybook, loadPlaybooks } from "../src/playbooks.js";
 import { getGitignoreAdvisory } from "../src/gitignore.js";
@@ -47,6 +48,7 @@ const COMMANDS = [
   ["choose", "choose a step outcome"],
   ["cancel", "cancel an active playbook run"],
   ["history", "browse completed playbook runs"],
+  ["rundiff", "compare recent completed playbook runs"],
 ] as const;
 
 type CommandContext = {
@@ -176,6 +178,9 @@ export async function handlePlaybookCommand(
     case "history":
       await showHistory(ctx.cwd, ui);
       return;
+    case "rundiff":
+      await showRunDiff(ctx.cwd, ui);
+      return;
     case "cancel":
     case "stop":
     case "abort":
@@ -288,6 +293,38 @@ async function showStatus(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined)
     return;
   }
   await notifyWithGitignoreAdvisory(cwd, ui, presentation.lines, notifyLevel);
+}
+
+async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
+  const diffs = await loadRecentRunDiffs(cwd);
+  if (diffs.length === 0) {
+    notify(
+      ui,
+      [
+        "Not enough completed runs to compare.",
+        "You need at least 2 completed runs to see a run diff.",
+        "Complete runs with /playbook:done; browse finished runs with /playbook:history.",
+      ].join("\n"),
+      "info",
+    );
+    return;
+  }
+
+  if (hasSelectionUI(ui) && diffs.length > 1) {
+    const selected = await selectByLabel(
+      ui,
+      "Compare which run pair?",
+      diffs.map((diff) => ({
+        label: `${diff.newer.runId} vs ${diff.older.runId}`,
+        value: diff,
+      })),
+    );
+    if (!selected) return;
+    notify(ui, formatRunDiff(selected).join("\n"), "info");
+    return;
+  }
+
+  notify(ui, formatRunDiff(diffs[0]).join("\n"), "info");
 }
 
 async function showHistory(cwd: string, ui: UiLike | undefined): Promise<void> {

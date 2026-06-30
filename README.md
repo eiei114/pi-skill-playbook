@@ -103,6 +103,7 @@ The widget displays the current step, exact skill command, completion criteria, 
 | `/playbook:choose` | Select an outcome for multi-branch steps |
 | `/playbook:cancel` | Select and confirm an active run cancellation |
 | `/playbook:history` | Browse completed runs (read-only; active runs use `/playbook:resume`) |
+| `/playbook:rundiff` | Compare recent completed runs with a compact diff summary |
 | `/playbook:record:start <id> [--name <name>]` | Start recording an explicit skill flow |
 | `/playbook:record:mark [<skill>]` | Mark explicit skill usage (selection UI when omitted) |
 | `/playbook:record:branch <outcome>` | Record a branch outcome label before the next skill mark |
