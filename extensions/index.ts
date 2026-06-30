@@ -296,7 +296,9 @@ async function showStatus(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined)
 }
 
 async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
-  const diffs = await loadRecentRunDiffs(cwd);
+  const diffs = hasSelectionUI(ui)
+    ? await loadRecentRunDiffs(cwd)
+    : await loadRecentRunDiffs(cwd, 2);
   if (diffs.length === 0) {
     notify(
       ui,
