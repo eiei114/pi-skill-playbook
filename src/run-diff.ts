@@ -146,11 +146,15 @@ export function formatRunDiff(result: RunDiffResult): string[] {
 export async function loadRecentRunDiffs(cwd: string, count?: number): Promise<RunDiffResult[]> {
   const runs = await listCompletedRuns(cwd);
   const maxRuns = count ?? runs.length;
+  const limit = Math.min(maxRuns, runs.length);
+  const entries = await Promise.all(
+    runs.slice(0, limit).map((run) => toRunDiffEntryFromRun(cwd, run)),
+  );
   const results: RunDiffResult[] = [];
 
-  for (let i = 0; i < maxRuns - 1 && i + 1 < runs.length; i++) {
-    const newerEntry = await toRunDiffEntryFromRun(cwd, runs[i]);
-    const olderEntry = await toRunDiffEntryFromRun(cwd, runs[i + 1]);
+  for (let i = 0; i < entries.length - 1; i++) {
+    const newerEntry = entries[i];
+    const olderEntry = entries[i + 1];
     if (newerEntry && olderEntry) {
       results.push(computeRunDiff(newerEntry, olderEntry));
     }
