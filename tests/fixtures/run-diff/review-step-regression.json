@@ -1,0 +1,37 @@
+{
+  "id": "review-step-regression",
+  "description": "Pi OSS delivery review step regressed from pass to fail.",
+  "newer": {
+    "runId": "oss-delivery-20260630-v2",
+    "playbookName": "Pi OSS New Delivery",
+    "completedAt": "2026-06-30T14:00:00.000Z",
+    "history": [
+      { "at": "2026-06-29T08:00:00.000Z", "step": "grill", "outcome": "ready-for-prd", "to": "prd" },
+      { "at": "2026-06-29T09:00:00.000Z", "step": "prd", "outcome": "ready-for-issues", "to": "issues" },
+      { "at": "2026-06-29T10:00:00.000Z", "step": "issues", "outcome": "ready-for-implement", "to": "implement" },
+      { "at": "2026-06-29T11:00:00.000Z", "step": "implement", "outcome": "ready-for-review", "to": "review" },
+      { "at": "2026-06-30T14:00:00.000Z", "step": "review", "outcome": "fail", "to": "complete" }
+    ]
+  },
+  "older": {
+    "runId": "oss-delivery-20260629-v1",
+    "playbookName": "Pi OSS New Delivery",
+    "completedAt": "2026-06-29T12:00:00.000Z",
+    "history": [
+      { "at": "2026-06-29T08:00:00.000Z", "step": "grill", "outcome": "ready-for-prd", "to": "prd" },
+      { "at": "2026-06-29T09:00:00.000Z", "step": "prd", "outcome": "ready-for-issues", "to": "issues" },
+      { "at": "2026-06-29T10:00:00.000Z", "step": "issues", "outcome": "ready-for-implement", "to": "implement" },
+      { "at": "2026-06-29T11:00:00.000Z", "step": "implement", "outcome": "ready-for-review", "to": "review" },
+      { "at": "2026-06-29T12:00:00.000Z", "step": "review", "outcome": "pass", "to": "complete" }
+    ]
+  },
+  "expect": {
+    "summaryLineCount": 5,
+    "includes": [
+      "Step 5 \"review\" differs: outcome \"fail\" was \"pass\""
+    ],
+    "excludes": [
+      "Final outcome changed"
+    ]
+  }
+}

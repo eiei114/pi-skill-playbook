@@ -72,19 +72,26 @@ After a CI rebuild in a Pi OSS delivery, the `review` step previously passed but
 > /playbook:rundiff
 Run diff: oss-delivery-20260630-v2 vs oss-delivery-20260629-v1
   Newer: Pi OSS New Delivery (2026-06-30T14:00:00.000Z) — fail
-  Older: Pi OSS New Delivery (2026-06-29T10:00:00.000Z) — pass
+  Older: Pi OSS New Delivery (2026-06-29T12:00:00.000Z) — pass
 Changes:
-  Step 5 differs: outcome "fail" was "pass"
-  Final outcome changed: "fail" (was "pass")
+  Step 5 "review" differs: outcome "fail" was "pass"
 ```
 
-The compact diff surfaces the regression immediately — the reviewer can focus on the `review` step's test evidence without digging through raw run files.
+Dogfood on this regression case showed the summary is enough for triage: five
+lines versus opening two raw run files (~60+ lines of JSON). The header already
+shows final outcomes, so the change list focuses on the step that regressed.
+Use `/playbook:history` when you need timestamps or the full per-step trail.
 
 ### When to use rundiff vs history
 
 | Use case | Command |
 | --- | --- |
+| Spot-checking whether the latest run changed vs the previous one | `/playbook:rundiff` |
+| Comparing non-adjacent runs (pick a pair when multiple diffs exist) | `/playbook:rundiff` |
 | Browsing all completed runs (metadata) | `/playbook:history` |
-| Comparing two recent run outputs | `/playbook:rundiff` |
-| Drilling into one run's detail | `/playbook:history` then select a run |
+| Drilling into one run's full history | `/playbook:history` then select a run |
 | Checking active run status | `/playbook:status` |
+
+Skip `/playbook:rundiff` when runs took different playbook paths — aligned
+step diffs can cascade. In that case start with `/playbook:history` and inspect
+each run's trail.

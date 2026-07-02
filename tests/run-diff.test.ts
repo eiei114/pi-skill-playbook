@@ -7,6 +7,7 @@ import {
   toRunDiffEntry,
   computeRunDiff,
   formatRunDiff,
+  formatRunDiffPairLabel,
   loadRecentRunDiffs,
 } from "../src/run-diff.js";
 import { handlePlaybookCommand } from "../extensions/index.js";
@@ -113,7 +114,7 @@ test("computeRunDiff shows changed output when final outcome differs", () => {
 
   const result = computeRunDiff(newer, older);
   assert.ok(result.changes.length > 0);
-  assert.ok(result.changes.some((c) => c.includes("Step 2 differs")));
+  assert.ok(result.changes.some((c) => c.includes('Step 2 "prd" differs')));
   assert.ok(result.changes.some((c) => c.includes("implement")));
   assert.ok(result.changes.some((c) => c.includes("issues")));
 });
@@ -127,7 +128,7 @@ test("computeRunDiff shows extra step added", () => {
 
   const result = computeRunDiff(newer, older);
   assert.ok(result.changes.length > 0);
-  assert.ok(result.changes.some((c) => c.includes("Step 4 added")));
+  assert.ok(result.changes.some((c) => c.includes('Step 4 "review" added')));
   assert.ok(result.changes.some((c) => c.includes("review")));
   assert.ok(result.changes.some((c) => c.includes("pass")));
 });
@@ -142,7 +143,7 @@ test("computeRunDiff shows playbook name difference", () => {
   assert.ok(result.changes.some((c) => c.includes("Playbook B")));
 });
 
-test("computeRunDiff shows final outcome difference", () => {
+test("computeRunDiff surfaces final outcome difference in step detail, not a duplicate line", () => {
   const changed = baseHistorySame.map((h) => ({ ...h }));
   changed[changed.length - 1] = { ...changed[changed.length - 1], outcome: "cancelled", to: "cancelled" };
 
@@ -150,7 +151,8 @@ test("computeRunDiff shows final outcome difference", () => {
   const older = toRunDiffEntry(makeRun("older", "2026-06-01T12:00:00.000Z", changed), "Test")!;
 
   const result = computeRunDiff(newer, older);
-  assert.ok(result.changes.some((c) => c.includes("Final outcome")));
+  assert.ok(!result.changes.some((c) => c.includes("Final outcome changed")));
+  assert.ok(result.changes.some((c) => c.includes('Step 3 "issues" differs')));
   assert.ok(result.changes.some((c) => c.includes("complete")));
   assert.ok(result.changes.some((c) => c.includes("cancelled")));
 });
@@ -160,7 +162,7 @@ test("computeRunDiff shows step removed", () => {
   const older = toRunDiffEntry(makeRun("older", "2026-06-01T12:00:00.000Z", baseHistoryExtraStep), "Test")!;
 
   const result = computeRunDiff(newer, older);
-  assert.ok(result.changes.some((c) => c.includes("Step 4 removed")), JSON.stringify(result.changes));
+  assert.ok(result.changes.some((c) => c.includes('Step 4 "review" removed')), JSON.stringify(result.changes));
   assert.ok(result.changes.some((c) => c.includes("review")));
 });
 
@@ -176,7 +178,7 @@ test("formatRunDiff produces readable lines", () => {
   assert.ok(lines.some((line) => line.includes("Newer:")));
   assert.ok(lines.some((line) => line.includes("Older:")));
   assert.ok(lines.some((line) => line.includes("Changes:")));
-  assert.ok(lines.some((line) => line.includes("Step 2 differs")));
+  assert.ok(lines.some((line) => line.includes('Step 2 "prd" differs')));
 });
 
 test("formatRunDiff handles identical runs", () => {
@@ -321,11 +323,42 @@ test("/playbook:rundiff shows changed output when histories differ", async () =>
 
     const message = ui.notifications.map((item) => item.message).join("\n");
     assert.match(message, /Run diff:/);
-    assert.match(message, /Step 2 differs/);
+    assert.match(message, /Step 2 "prd" differs/);
     assert.match(message, /differ/);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
+});
+
+test("dogfood regression: review step pass to fail is compact and names the step", () => {
+  const passHistory: PlaybookRunHistoryEntry[] = [
+    { at: "2026-06-29T08:00:00.000Z", step: "grill", outcome: "ready-for-prd", to: "prd" },
+    { at: "2026-06-29T09:00:00.000Z", step: "prd", outcome: "ready-for-issues", to: "issues" },
+    { at: "2026-06-29T10:00:00.000Z", step: "issues", outcome: "ready-for-implement", to: "implement" },
+    { at: "2026-06-29T11:00:00.000Z", step: "implement", outcome: "ready-for-review", to: "review" },
+    { at: "2026-06-29T12:00:00.000Z", step: "review", outcome: "pass", to: "complete" },
+  ];
+  const failHistory = passHistory.slice(0, 4).concat([
+    { at: "2026-06-30T14:00:00.000Z", step: "review", outcome: "fail", to: "complete" },
+  ]);
+
+  const newer = toRunDiffEntry(makeRun("oss-delivery-20260630-v2", "2026-06-30T14:00:00.000Z", failHistory), "Pi OSS New Delivery")!;
+  const older = toRunDiffEntry(makeRun("oss-delivery-20260629-v1", "2026-06-29T12:00:00.000Z", passHistory), "Pi OSS New Delivery")!;
+  const lines = formatRunDiff(computeRunDiff(newer, older));
+
+  assert.equal(lines.length, 5);
+  assert.match(lines[1], /— fail$/);
+  assert.match(lines[2], /— pass$/);
+  assert.ok(lines.some((line) => line.includes('Step 5 "review" differs: outcome "fail" was "pass"')));
+  assert.ok(!lines.some((line) => line.includes("Final outcome changed")));
+});
+
+test("formatRunDiffPairLabel includes outcomes for run-pair selection", () => {
+  const newer = toRunDiffEntry(makeRun("run-2", "2026-06-02T12:00:00.000Z", baseHistoryChanged), "Test")!;
+  const older = toRunDiffEntry(makeRun("run-1", "2026-06-01T12:00:00.000Z", baseHistorySame), "Test")!;
+  const label = formatRunDiffPairLabel(computeRunDiff(newer, older));
+
+  assert.equal(label, "run-2 (complete) vs run-1 (complete)");
 });
 
 const basePlaybookYaml = `

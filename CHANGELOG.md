@@ -2,6 +2,9 @@
 
 ## 1.4.0
 
+- Dogfood review of `/playbook:rundiff`: step change lines include step names, duplicate final-outcome lines are omitted, and run-pair selectors show outcomes.
+- Documented when to prefer rundiff vs history after regression dogfood.
+
 - Added `/playbook:rundiff` to compare recent completed playbook runs with a compact diff view.
 - The diff highlights meaningful changes: different playbooks, step sequences, outcomes, and extra/missing steps.
 - Handles edge cases: identical runs (shows "All steps match"), changed runs (per-step diff), and insufficient runs (guidance to complete more runs).
