@@ -49,9 +49,8 @@ export function toRunDiffEntry(run: PlaybookRunState, playbookName: string): Run
  * meaningful changes.
  *
  * The diff highlights:
- *  - Which run is newer/older
+ *  - Which run is newer/older (header includes final outcomes)
  *  - Different playbooks
- *  - Different final outcomes
  *  - Different step counts
  *  - Per-step differences (step name, outcome, destination)
  *  - Extra or missing steps
@@ -64,11 +63,6 @@ export function computeRunDiff(newer: RunDiffEntry, older: RunDiffEntry): RunDif
     changes.push(`Playbook changed: "${newer.playbookName}" vs "${older.playbookName}"`);
   }
 
-  // Final outcome difference
-  if (newer.finalOutcome !== older.finalOutcome) {
-    changes.push(`Final outcome changed: "${newer.finalOutcome}" (was "${older.finalOutcome}")`);
-  }
-
   // Step count difference
   if (newer.stepCount !== older.stepCount) {
     changes.push(`Step count changed: ${newer.stepCount} steps (was ${older.stepCount})`);
@@ -79,14 +73,15 @@ export function computeRunDiff(newer: RunDiffEntry, older: RunDiffEntry): RunDif
   for (let i = 0; i < maxLen; i++) {
     const n = newer.history[i];
     const o = older.history[i];
-    const stepLabel = `Step ${i + 1}`;
+    const stepName = n?.step ?? o?.step;
+    const stepLabel = stepName ? `Step ${i + 1} "${stepName}"` : `Step ${i + 1}`;
 
     if (!o && n) {
       // New step appeared
-      changes.push(`${stepLabel} added: "${n.step}" → ${n.outcome} (${n.to})`);
+      changes.push(`${stepLabel} added: → ${n.outcome} (${n.to})`);
     } else if (!n && o) {
       // Step removed
-      changes.push(`${stepLabel} removed: was "${o.step}" → ${o.outcome} (${o.to})`);
+      changes.push(`${stepLabel} removed: was ${o.outcome} (${o.to})`);
     } else if (n && o) {
       const diffs: string[] = [];
       if (n.step !== o.step) diffs.push(`step "${n.step}" was "${o.step}"`);
@@ -119,6 +114,10 @@ export function computeRunDiff(newer: RunDiffEntry, older: RunDiffEntry): RunDif
  *   Step 2 differs: step "prd" was "issues"
  *   Step 3 removed: was "review" → pass (complete)
  */
+export function formatRunDiffPairLabel(result: RunDiffResult): string {
+  return `${result.newer.runId} (${result.newer.finalOutcome}) vs ${result.older.runId} (${result.older.finalOutcome})`;
+}
+
 export function formatRunDiff(result: RunDiffResult): string[] {
   const lines: string[] = [
     `Run diff: ${result.newer.runId} vs ${result.older.runId}`,

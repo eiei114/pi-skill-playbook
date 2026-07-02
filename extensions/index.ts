@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { lastAssistantText, parseOutcomeMarker, parseSkillInvocation, planCompletion, renderPlaybookPrompt } from "../src/auto-advance.js";
 import { formatCompletedRunLine, listCompletedRunSummaries, renderCompletedRunDetail } from "../src/history.js";
-import { formatRunDiff, loadRecentRunDiffs } from "../src/run-diff.js";
+import { formatRunDiff, formatRunDiffPairLabel, loadRecentRunDiffs } from "../src/run-diff.js";
 import { clearActiveRun, createRunId, listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
 import { findPlaybook, loadPlaybooks } from "../src/playbooks.js";
 import { getGitignoreAdvisory } from "../src/gitignore.js";
@@ -317,7 +317,7 @@ async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
       ui,
       "Compare which run pair?",
       diffs.map((diff) => ({
-        label: `${diff.newer.runId} vs ${diff.older.runId}`,
+        label: formatRunDiffPairLabel(diff),
         value: diff,
       })),
     );
