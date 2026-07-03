@@ -1,3 +1,4 @@
+import { DEFAULT_FETCH_TIMEOUT_MS, fetchWithTimeout } from "./fetch-with-timeout.js";
 import type { FetchLike } from "./search-provider.js";
 
 export interface FetchedUrlContent {
@@ -29,12 +30,12 @@ export async function fetchUrlContent(
   fetchFn: FetchLike = fetch,
   now: () => string = () => new Date().toISOString(),
 ): Promise<FetchedUrlContent> {
-  const response = await fetchFn(url, {
+  const response = await fetchWithTimeout(fetchFn, url, {
     headers: {
       Accept: "text/html,application/xhtml+xml,text/plain;q=0.9,*/*;q=0.8",
       "User-Agent": "pi-skill-playbook-import-web/1.0",
     },
-  });
+  }, DEFAULT_FETCH_TIMEOUT_MS);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url} (${response.status} ${response.statusText}).`);

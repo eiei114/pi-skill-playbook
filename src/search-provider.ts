@@ -1,3 +1,5 @@
+import { DEFAULT_FETCH_TIMEOUT_MS, fetchWithTimeout } from "./fetch-with-timeout.js";
+
 export interface SearchResult {
   url: string;
   title: string;
@@ -30,12 +32,12 @@ export function createBraveSearchAdapter(apiKey: string, fetchFn: FetchLike = fe
       url.searchParams.set("q", query);
       url.searchParams.set("count", String(count));
 
-      const response = await fetchFn(url, {
+      const response = await fetchWithTimeout(fetchFn, url, {
         headers: {
           Accept: "application/json",
           "X-Subscription-Token": apiKey,
         },
-      });
+      }, DEFAULT_FETCH_TIMEOUT_MS);
 
       if (!response.ok) {
         throw new Error(`Brave Search request failed (${response.status} ${response.statusText}).`);

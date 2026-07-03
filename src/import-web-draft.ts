@@ -1,7 +1,7 @@
 import { parse } from "yaml";
 import type { FetchedUrlContent } from "./url-content.js";
 import type { PlaybookDefinition } from "./types.js";
-import { normalizeSkillCommandName } from "./validation.js";
+import { normalizeSkillCommandName, validatePlaybook } from "./validation.js";
 
 export interface ModelDraftRequest {
   query?: string;
@@ -72,6 +72,16 @@ export function parseImportedPlaybookDraft(raw: string, targetId?: string): Play
 
   const definition = parsed as PlaybookDefinition;
   if (targetId) definition.id = targetId;
+
+  const validation = validatePlaybook(
+    { path: "imported-draft", definition },
+    new Set(),
+    { requireSkills: false },
+  );
+  if (!validation.valid) {
+    throw new Error(`Imported playbook draft is invalid:\n${validation.errors.join("\n")}`);
+  }
+
   return definition;
 }
 
@@ -144,11 +154,7 @@ function resolveSkillName(skillName: string, availableSkills: ReadonlySet<string
   if (exactIgnoreCase) return exactIgnoreCase;
 
   const slug = skillName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-  const slugMatch = normalizedTargets.find((candidate) => candidate === slug);
-  if (slugMatch) return slugMatch;
-
-  const contains = normalizedTargets.find((candidate) => candidate.includes(slug) || slug.includes(candidate));
-  return contains;
+  return normalizedTargets.find((candidate) => candidate === slug);
 }
 
 export function formatMissingSkillErrors(missingSkills: string[], availableSkills: ReadonlySet<string>): string {

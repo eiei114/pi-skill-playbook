@@ -43,7 +43,7 @@ export function importWebUsage(): string {
 }
 
 export async function handleImportWebCommand(
-  pi: ExtensionAPI,
+  pi: Pick<ExtensionAPI, "getCommands">,
   args: string,
   ctx: ImportWebContext,
   deps: ImportWebDeps = {},
@@ -95,12 +95,17 @@ export async function handleImportWebCommand(
     return;
   }
 
-  const fetched = await fetchUrlContents(urls, deps.fetchFn, deps.now);
   const modelDrafter = deps.modelDrafter;
   if (!modelDrafter) {
     notify(ui, "Model drafting is unavailable. Configure a Pi model provider before running import-web.", "error");
     return;
   }
+  if (!ui?.confirm) {
+    notify(ui, "Confirmation UI is required before model-assisted drafting.", "error");
+    return;
+  }
+
+  const fetched = await fetchUrlContents(urls, deps.fetchFn, deps.now);
 
   const draftRequest: ModelDraftRequest = {
     query,
@@ -109,11 +114,6 @@ export async function handleImportWebCommand(
     targetId: parsed.id,
   };
   const draftPrompt = buildDraftPrompt(draftRequest);
-
-  if (!ui?.confirm) {
-    notify(ui, "Confirmation UI is required before model-assisted drafting.", "error");
-    return;
-  }
 
   const modelConfirmed = await ui.confirm(
     "Send model-assisted draft request?",
@@ -208,7 +208,7 @@ function formatSearchResultLabel(result: SearchResult): string {
   return `${result.title} (${result.url})${snippet}`;
 }
 
-function getAvailableSkills(pi: ExtensionAPI): ReadonlySet<string> {
+function getAvailableSkills(pi: Pick<ExtensionAPI, "getCommands">): ReadonlySet<string> {
   const skills = pi.getCommands()
     .filter((command) => command.source === "skill")
     .map((command) => normalizeSkillCommandName(command.name));

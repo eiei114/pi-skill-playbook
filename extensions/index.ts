@@ -9,7 +9,7 @@ import { renderValidationErrors } from "../src/render.js";
 import { buildRunStatusPresentation, notifyLevelForValidation } from "../src/status.js";
 import { normalizeSkillCommandName, validatePlaybook, validateUniquePlaybookIds } from "../src/validation.js";
 import { handleImportWebCommand } from "../src/import-web-handlers.js";
-import { createModelDrafterFromContext } from "../src/import-web-model.js";
+import { createModelDrafterFromContext } from "./import-web-pi-bridge.js";
 import { handleRecordCommand, RECORD_COMMANDS, recordUsage } from "../src/record-handlers.js";
 import type { LoadedPlaybook, PlaybookRunState } from "../src/types.js";
 

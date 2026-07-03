@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -17,6 +18,21 @@ import type { PlaybookDefinition } from "../src/types.js";
 
 const skills = new Set(["grill-with-docs", "to-prd", "to-issues"]);
 
+function mockSkillCommands(names: string[]): Pick<ExtensionAPI, "getCommands"> {
+  return {
+    getCommands: () => names.map((name) => ({
+      source: "skill" as const,
+      name,
+      sourceInfo: {
+        path: `/virtual/${name}.md`,
+        source: "test",
+        scope: "temporary" as const,
+        origin: "top-level" as const,
+      },
+    })),
+  };
+}
+
 const sampleYaml = `
 version: 1
 id: imported-flow
@@ -25,6 +41,8 @@ entry: grill
 skills:
   grill-with-docs:
     role: entry
+  to-prd:
+    role: internal
 steps:
   grill:
     primarySkill: grill-with-docs
@@ -102,6 +120,35 @@ test("attachRequiredSourceTrace stores provenance metadata", () => {
   ]);
 });
 
+test("parseImportedPlaybookDraft rejects malformed drafts before skill mapping", () => {
+  assert.throws(
+    () => parseImportedPlaybookDraft("```yaml\nversion: 1\nid: bad\n```"),
+    /Imported playbook draft is invalid/,
+  );
+});
+
+test("mapSkillsBestEffort does not map ambiguous substring skill names", () => {
+  const ambiguousSkills = new Set(["read-file"]);
+  const definition: PlaybookDefinition = {
+    version: 1,
+    id: "ambiguous",
+    name: "Ambiguous",
+    entry: "step",
+    skills: { "read-file": { role: "entry" } },
+    steps: {
+      step: {
+        primarySkill: "delete-and-read-file",
+        commandHint: "/skill:delete-and-read-file",
+        doneWhen: ["ok"],
+        transitions: [{ outcome: "complete", to: "complete" }],
+      },
+    },
+  };
+
+  const mapped = mapSkillsBestEffort(definition, ambiguousSkills);
+  assert.equal(mapped.definition.steps.step.primarySkill, "delete-and-read-file");
+  assert.deepEqual(mapped.missingSkills, ["delete-and-read-file"]);
+});
 test("mapSkillsBestEffort maps close skill names and reports missing ones", () => {
   const definition: PlaybookDefinition = {
     version: 1,
@@ -151,19 +198,34 @@ test("htmlToText strips basic markup", () => {
   assert.doesNotMatch(text, /<h1>/);
 });
 
+test("handleImportWebCommand skips URL fetch when model drafting is unavailable", async () => {
+  const ui = new MockUi();
+  const pi = mockSkillCommands(["skill:grill-with-docs"]);
+  let fetchCalled = false;
+
+  await handleImportWebCommand(
+    pi,
+    "--url https://example.com/workflow",
+    { cwd: tmpdir(), hasUI: true, ui },
+    {
+      fetchFn: async () => {
+        fetchCalled = true;
+        return new Response("body", { status: 200 });
+      },
+    },
+  );
+
+  assert.equal(fetchCalled, false);
+  assert.match(ui.notifications.at(-1)?.message ?? "", /Model drafting is unavailable/);
+});
 test("handleImportWebCommand saves imported draft after model confirmation", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-import-web-"));
   try {
     const ui = new MockUi();
-    const pi = {
-      getCommands: () => [
-        { source: "skill", name: "skill:grill-with-docs" },
-        { source: "skill", name: "skill:to-prd" },
-      ],
-    };
+    const pi = mockSkillCommands(["skill:grill-with-docs", "skill:to-prd"]);
 
     await handleImportWebCommand(
-      pi as any,
+      pi,
       "--url https://example.com/workflow --id imported-flow",
       { cwd, hasUI: true, ui },
       {
@@ -190,10 +252,10 @@ test("handleImportWebCommand blocks save when required skills remain missing", a
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-import-web-missing-"));
   try {
     const ui = new MockUi();
-    const pi = { getCommands: () => [{ source: "skill", name: "skill:grill-with-docs" }] };
+    const pi = mockSkillCommands(["skill:grill-with-docs"]);
 
     await handleImportWebCommand(
-      pi as any,
+      pi,
       "--url https://example.com/workflow",
       { cwd, hasUI: true, ui },
       {
