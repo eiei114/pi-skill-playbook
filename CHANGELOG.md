@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.5.0
+
+- Implemented `/playbook:import-web` to import external workflow articles into validated playbook drafts.
+- Added Brave Search adapter support (`BRAVE_SEARCH_API_KEY` or `BRAVE_API_KEY`), URL fetching, model-assisted drafting with confirmation, skill mapping, and Required Source Trace metadata in saved YAML.
+- Documented Brave Search and model configuration requirements in README.
+
 ## 1.4.0
 
 - Dogfood review of `/playbook:rundiff`: step change lines include step names, duplicate final-outcome lines are omitted, and run-pair selectors show outcomes.

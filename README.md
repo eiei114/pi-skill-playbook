@@ -109,8 +109,9 @@ The widget displays the current step, exact skill command, completion criteria, 
 | `/playbook:record:branch <outcome>` | Record a branch outcome label before the next skill mark |
 | `/playbook:record:stop` | Preview, validate, confirm, and save a recorded playbook draft |
 | `/playbook:record:status` | Show the active recording session |
+| `/playbook:import-web [<query>] [--url <url> ...] [--id <id>]` | Import an external web workflow into a validated draft |
 
-All core run commands are argument-free. Record subcommands use explicit marks and optional args as shown above.
+Core run commands are argument-free. Record and import-web accept optional args as shown above.
 
 ### Run lifecycle
 
@@ -127,9 +128,19 @@ Finished runs stay on disk for reference; `/playbook:history` lists compact meta
 | Command | Source | When to use |
 |---|---|---|
 | `/playbook:record:*` | Your own explicit skill usage during day-to-day work | Grow playbooks from internal flows you already run |
-| `/playbook:import-web` | Web search + URLs (deferred) | Import external workflow articles with Required Source Trace |
+| `/playbook:import-web` | Web search + URLs | Import external workflow articles with Required Source Trace |
 
-Record never scrapes session logs or infers skills automatically. Import-web (when implemented) never replaces recording — it complements it for external sources.
+Record never scrapes session logs or infers skills automatically. Import-web complements recording for external sources.
+
+### Import-web configuration
+
+`/playbook:import-web` needs:
+
+- **Brave Search** for query-based discovery. Set `BRAVE_SEARCH_API_KEY` (preferred) or `BRAVE_API_KEY` in the environment before starting Pi.
+- **An active Pi model provider** for model-assisted drafting. The command shows the draft prompt and asks for confirmation before any model request is sent.
+- **Pi TUI confirmation UI** for model drafting and save confirmation.
+
+Happy path: run `/playbook:import-web` without args, enter a query, pick a search result, confirm the model draft request, then confirm save. You can also pass explicit URLs with `--url` and optionally pin the playbook id with `--id`.
 
 ### Auto advance
 

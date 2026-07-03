@@ -8,6 +8,8 @@ import { getGitignoreAdvisory } from "../src/gitignore.js";
 import { renderValidationErrors } from "../src/render.js";
 import { buildRunStatusPresentation, notifyLevelForValidation } from "../src/status.js";
 import { normalizeSkillCommandName, validatePlaybook, validateUniquePlaybookIds } from "../src/validation.js";
+import { handleImportWebCommand } from "../src/import-web-handlers.js";
+import { createModelDrafterFromContext } from "../src/import-web-model.js";
 import { handleRecordCommand, RECORD_COMMANDS, recordUsage } from "../src/record-handlers.js";
 import type { LoadedPlaybook, PlaybookRunState } from "../src/types.js";
 
@@ -147,6 +149,19 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
       }
     },
   });
+
+  pi.registerCommand("playbook:import-web", {
+    description: "Playbook: import an external web workflow into a validated draft.",
+    handler: async (args, ctx) => {
+      try {
+        await handleImportWebCommand(pi, args, ctx, {
+          modelDrafter: createModelDrafterFromContext(ctx),
+        });
+      } catch (error) {
+        notify(ctx.hasUI ? ctx.ui : undefined, error instanceof Error ? error.message : String(error), "error");
+      }
+    },
+  });
 }
 
 export async function handlePlaybookCommand(
@@ -185,9 +200,6 @@ export async function handlePlaybookCommand(
     case "stop":
     case "abort":
       await cancelRun(ctx.cwd, ui);
-      return;
-    case "import-web":
-      notify(ui, `/playbook:${command} is deferred after the Core 6 MVP scaffold.`, "warning");
       return;
     default:
       notify(ui, usage(), "error");
@@ -662,6 +674,7 @@ function usage(): string {
     "/playbook:history",
     "",
     recordUsage(),
+    "/playbook:import-web [<query>] [--url <url> ...] [--id <playbook-id>]",
   ].join("\n");
 }
 
