@@ -1,9 +1,14 @@
 {
   "name": "pi-skill-playbook",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "type": "module",
   "description": "Pi extension for passive, human-mediated Agent Skill playbooks.",
-  "keywords": ["pi-package", "pi-extension", "agent-skills", "playbook"],
+  "keywords": [
+    "pi-package",
+    "pi-extension",
+    "agent-skills",
+    "playbook"
+  ],
   "repository": {
     "type": "git",
     "url": "git+https://github.com/eiei114/pi-skill-playbook.git"
@@ -32,7 +37,9 @@
     "ci": "npm run typecheck && npm test && npm run validate:package && npm run actions:check"
   },
   "pi": {
-    "extensions": ["./extensions/index.ts"]
+    "extensions": [
+      "./extensions/index.ts"
+    ]
   },
   "dependencies": {
     "yaml": "^2.8.1"

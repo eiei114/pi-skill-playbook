@@ -6,6 +6,7 @@
 [![npm downloads](https://img.shields.io/npm/dt/pi-skill-playbook.svg)](https://www.npmjs.com/package/pi-skill-playbook)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Pi package](https://img.shields.io/badge/Pi-package-blue)](https://github.com/eiei114/pi-skill-playbook)
+<a href="https://buymeacoffee.com/ekawano114m"><img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="217" height="60"></a>
 
 Human-mediated Agent Skill playbooks for the [Pi coding agent](https://github.com/earendil-works/pi-coding-agent).
 

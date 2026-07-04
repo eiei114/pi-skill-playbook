@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Add Buy Me a Coffee sponsor button to README and native GitHub funding link via `.github/FUNDING.yml`.
+
 ## 1.5.0
 
 - Implemented `/playbook:import-web` to import external workflow articles into validated playbook drafts.
@@ -65,3 +69,4 @@
 ## 0.1.4
 
 - Initial public release.
+
