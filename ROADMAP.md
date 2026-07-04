@@ -52,11 +52,11 @@ known compliance gaps.
 
 | # | Item | Type | Bump | Acceptance |
 | --- | --- | --- | --- | --- |
-| 1.1 | Pin **all** GitHub Actions to immutable SHAs. Today every workflow floats a tag: `ci.yml` uses `actions/checkout@v6` + `actions/setup-node@v4`; `auto-release.yml` and `publish.yml` use `@v4`. | compliance | none (CI-only) | `grep -R "uses: actions/" .github` shows only SHA-pinned refs; CI stays green. |
+| 1.1 | Pin **all** GitHub Actions to immutable SHAs. | compliance | none (CI-only) | ✅ done: workflows use SHA-pinned refs with source-version comments, and `npm run actions:check` guards against floating remote action refs. |
 | 1.2 | Close the `pi-extension-template` compliance checklist (section below); record every intentional deviation in this file. | compliance | none (docs) | Checklist section carries status + rationale; deviations are explicit. |
 | 1.3 | README alignment: assert the seven documented commands (`/playbook:list`, `/playbook:start`, `/playbook:resume`, `/playbook:status`, `/playbook:done`, `/playbook:choose`, `/playbook:cancel`) and the YAML structure / `autoAdvance` modes match the code in `extensions/index.ts` and `src/validation.ts`. | docs | none (test+docs) | A smoke test extracts command tokens from `extensions/index.ts` and compares them to README; drift fails CI. (Carries the standing **README alignment** backlog task.) |
 | 1.4 | `npm pack` contents audit: `files` currently ships `extensions/`, `src/`, `docs/`, `samples/`, `LICENSE`, `README.md` — but **not** `CHANGELOG.md` or `SECURITY.md`. Decide and align with the template (ship both). | quality | patch | `npm run validate:package` output is the expected manifest; `CHANGELOG.md` + `SECURITY.md` are intentionally included or excluded with a recorded reason. |
-| 1.5 | Add a `version:check` PR guard (`scripts/check-version-bump.mjs`) so a PR touching `src/` or `extensions/` must bump `package.json` version and add a `CHANGELOG.md` entry. | quality | none (build infra) | Guard runs in `ci.yml`; a code-only PR without a bump fails CI. |
+| 1.5 | Add a `version:check` PR guard (`scripts/check-version-bump.mjs`) so a PR touching `src/` or `extensions/` must bump `package.json` version and add a `CHANGELOG.md` entry. | quality | none (build infra) | ✅ done: guard runs in `ci.yml`; code-only PRs without a bump fail CI. |
 
 ## Phase 2 — Month 2: Performance, token efficiency & design boundaries
 
@@ -133,13 +133,13 @@ Current status as of v1.0.1. Deviations are tracked here so they are intentional
 | `pi-package` keyword for discoverability | ✅ done | — |
 | `publishConfig.access = "public"` | ✅ done | — |
 | Combined `check` (typecheck + test + pack:dry) | ⚠️ partial | `npm run check` is typecheck-only; the combined gate is `npm run ci`. Consider aliasing `check` → `ci`. |
-| `version:check` PR guard | ❌ gap | no `scripts/` today → Phase 1.5 |
+| `version:check` PR guard | ✅ done | `scripts/check-version-bump.mjs` runs on PR CI |
 | CI validates PRs + `main` | ✅ done | `.github/workflows/ci.yml` on `push` + `pull_request` |
 | Auto-release → publish handoff | ✅ done | `auto-release.yml` → `publish.yml` |
 | npm provenance (`id-token: write`) | ✅ done | `publish.yml` |
 | Keep a Changelog + SemVer | ✅ done | `CHANGELOG.md` |
 | `SECURITY.md` + reporting policy | ✅ done | added in v1.0.1 |
-| **GitHub Actions pinned to immutable SHAs** | ❌ gap | all workflows float `@v*` → Phase 1.1 |
+| **GitHub Actions pinned to immutable SHAs** | ✅ done | SHA pins in workflows plus `scripts/check-actions-pinned.mjs` |
 | README ↔ registered commands drift guard | ❌ gap | to add in Phase 1.3 |
 | `npm pack` manifest ships CHANGELOG + SECURITY | ❌ gap | both missing from `files` → Phase 1.4 |
 
