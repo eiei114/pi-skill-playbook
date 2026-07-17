@@ -196,5 +196,9 @@ async function writePlaybook(cwd: string, file: string, yaml: string): Promise<s
 }
 
 async function writeGitignore(cwd: string): Promise<void> {
-  await writeFile(join(cwd, ".gitignore"), [".pi/playbook-runs/", ""].join("\n"), "utf8");
+  await writeFile(
+    join(cwd, ".gitignore"),
+    [".pi/playbook-runs/", ".pi/playbook-records/", ""].join("\n"),
+    "utf8",
+  );
 }

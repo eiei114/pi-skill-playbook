@@ -3,7 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { GITIGNORE_SNIPPET, getGitignoreAdvisory, isPlaybookRunsGitignored } from "../src/gitignore.js";
+import {
+  GITIGNORE_SNIPPET,
+  getGitignoreAdvisory,
+  isPlaybookRecordsGitignored,
+  isPlaybookRunsGitignored,
+} from "../src/gitignore.js";
 
 test("isPlaybookRunsGitignored detects common ignore patterns", () => {
   assert.equal(isPlaybookRunsGitignored(".pi/playbook-runs/\n"), true);
@@ -26,11 +31,33 @@ test("isPlaybookRunsGitignored respects later negation rules", () => {
   );
 });
 
-test("getGitignoreAdvisory returns undefined when run state is gitignored", async () => {
+test("isPlaybookRecordsGitignored detects common ignore patterns", () => {
+  assert.equal(isPlaybookRecordsGitignored(".pi/playbook-records/\n"), true);
+  assert.equal(isPlaybookRecordsGitignored(".pi/\n"), true);
+  assert.equal(isPlaybookRecordsGitignored("node_modules/\n"), false);
+});
+
+test("getGitignoreAdvisory returns undefined when run and record state are gitignored", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-gitignore-ignored-"));
   try {
-    await writeFile(join(cwd, ".gitignore"), ".pi/playbook-runs/\n", "utf8");
+    await writeFile(
+      join(cwd, ".gitignore"),
+      ".pi/playbook-runs/\n.pi/playbook-records/\n",
+      "utf8",
+    );
     assert.equal(await getGitignoreAdvisory(cwd), undefined);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("getGitignoreAdvisory returns records snippet when only run state is gitignored", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-gitignore-records-missing-"));
+  try {
+    await writeFile(join(cwd, ".gitignore"), ".pi/playbook-runs/\n", "utf8");
+    const advisory = await getGitignoreAdvisory(cwd);
+    assert.match(advisory ?? "", /playbook-records/);
+    assert.doesNotMatch(advisory ?? "", /playbook-runs/);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
