@@ -24,6 +24,7 @@ Add run state to the target repo's `.gitignore`:
 
 ```gitignore
 .pi/playbook-runs/
+.pi/playbook-records/
 ```
 
 ## Start a run

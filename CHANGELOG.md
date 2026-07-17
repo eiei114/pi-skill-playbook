@@ -4,6 +4,10 @@
 
 - Add Buy Me a Coffee sponsor button to README and native GitHub funding link via `.github/FUNDING.yml`.
 
+## 1.5.2
+
+- Runtime gitignore advisory now covers `.pi/playbook-records/` in addition to `.pi/playbook-runs/`; `docs/examples.md` aligned with README.
+
 ## 1.5.0
 
 - Implemented `/playbook:import-web` to import external workflow articles into validated playbook drafts.
