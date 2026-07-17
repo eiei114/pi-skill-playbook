@@ -1,6 +1,6 @@
 {
   "name": "pi-skill-playbook",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "type": "module",
   "description": "Pi extension for passive, human-mediated Agent Skill playbooks.",
   "keywords": [
