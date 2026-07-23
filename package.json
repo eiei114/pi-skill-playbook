@@ -18,6 +18,9 @@
   },
   "homepage": "https://github.com/eiei114/pi-skill-playbook#readme",
   "license": "MIT",
+  "engines": {
+    "node": ">=24"
+  },
   "files": [
     "extensions/",
     "src/",

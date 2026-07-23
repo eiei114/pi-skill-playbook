@@ -212,7 +212,8 @@ See [`samples/feature-development.yml`](samples/feature-development.yml) for a g
 
 ```bash
 npm install
-npm run check     # TypeScript type check
+npm run ci        # Full CI validation (typecheck, tests, package manifest, actions pin check)
+npm run check     # TypeScript type check only
 npm test          # Run tests (Node.js built-in test runner + tsx)
 ```
 
