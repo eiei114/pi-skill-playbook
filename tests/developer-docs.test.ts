@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
 
@@ -77,4 +77,31 @@ test("package.json ci script matches documented validation steps", () => {
   assert.match(ciScript, /test/);
   assert.match(ciScript, /validate:package/);
   assert.match(ciScript, /actions:check/);
+});
+
+test("workflows pin actions/checkout to a single immutable SHA", () => {
+  const workflowDir = join(repoRoot, ".github/workflows");
+  const checkoutRef = /actions\/checkout@([^\s#]+)/gi;
+  const shas = new Set<string>();
+  const invalidRefs: string[] = [];
+
+  for (const file of readdirSync(workflowDir).sort()) {
+    if (!/\.ya?ml$/i.test(file)) continue;
+    const content = readFileSync(join(workflowDir, file), "utf8");
+    for (const match of content.matchAll(checkoutRef)) {
+      const ref = match[1];
+      if (/^[0-9a-f]{40}$/i.test(ref)) {
+        shas.add(ref.toLowerCase());
+      } else {
+        invalidRefs.push(`${file}: actions/checkout@${ref}`);
+      }
+    }
+  }
+
+  assert.equal(
+    invalidRefs.length,
+    0,
+    `actions/checkout must use immutable 40-char SHAs, found: ${invalidRefs.join(", ")}`,
+  );
+  assert.equal(shas.size, 1, `expected one checkout SHA across workflows, found: ${[...shas].join(", ")}`);
 });
