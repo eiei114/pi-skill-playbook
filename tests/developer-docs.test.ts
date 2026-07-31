@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
+import { parse } from "yaml";
 
 const repoRoot = join(import.meta.dirname, "..");
 const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
@@ -37,6 +38,34 @@ function satisfiesNodeRange(range: string, version: string): boolean {
   }
 
   return false;
+}
+
+function collectCheckoutRefs(value: unknown, refs: string[]): void {
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectCheckoutRefs(item, refs);
+    }
+    return;
+  }
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  for (const [key, child] of Object.entries(value)) {
+    if (key === "uses" && typeof child === "string") {
+      const match = /^actions\/checkout@(.+)$/i.exec(child.trim());
+      if (match) {
+        refs.push(match[1].trim());
+      }
+    } else {
+      collectCheckoutRefs(child, refs);
+    }
+  }
+}
+
+function extractCheckoutRefsFromWorkflowYaml(source: string): string[] {
+  const refs: string[] = [];
+  collectCheckoutRefs(parse(source), refs);
+  return refs;
 }
 
 function extractDevelopmentSection(markdown: string): string {
@@ -79,17 +108,21 @@ test("package.json ci script matches documented validation steps", () => {
   assert.match(ciScript, /actions:check/);
 });
 
+test("checkout SHA scan ignores uses-like text inside run block scalars", () => {
+  const fixturePath = join(repoRoot, "tests/fixtures/workflows/block-scalar-false-positive.yml");
+  const refs = extractCheckoutRefsFromWorkflowYaml(readFileSync(fixturePath, "utf8"));
+  assert.deepEqual(refs, ["df4cb1c069e1874edd31b4311f1884172cec0e10"]);
+});
+
 test("workflows pin actions/checkout to a single immutable SHA", () => {
   const workflowDir = join(repoRoot, ".github/workflows");
-  const checkoutRef = /actions\/checkout@([^\s#]+)/gi;
   const shas = new Set<string>();
   const invalidRefs: string[] = [];
 
   for (const file of readdirSync(workflowDir).sort()) {
     if (!/\.ya?ml$/i.test(file)) continue;
     const content = readFileSync(join(workflowDir, file), "utf8");
-    for (const match of content.matchAll(checkoutRef)) {
-      const ref = match[1];
+    for (const ref of extractCheckoutRefsFromWorkflowYaml(content)) {
       if (/^[0-9a-f]{40}$/i.test(ref)) {
         shas.add(ref.toLowerCase());
       } else {
