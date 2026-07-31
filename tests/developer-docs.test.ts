@@ -81,14 +81,18 @@ test("package.json ci script matches documented validation steps", () => {
 
 test("workflows pin actions/checkout to a single immutable SHA", () => {
   const workflowDir = join(repoRoot, ".github/workflows");
-  const checkoutRef = /actions\/checkout@([^\s#]+)/gi;
+  const usesCheckout = /^\s*(?:-\s*)?uses:\s*(?:['"]?actions\/checkout@([^\s#'"]+)['"]?)/i;
   const shas = new Set<string>();
   const invalidRefs: string[] = [];
 
   for (const file of readdirSync(workflowDir).sort()) {
     if (!/\.ya?ml$/i.test(file)) continue;
     const content = readFileSync(join(workflowDir, file), "utf8");
-    for (const match of content.matchAll(checkoutRef)) {
+    for (const line of content.split(/\r?\n/)) {
+      const trimmed = line.trim();
+      if (!trimmed || trimmed.startsWith("#")) continue;
+      const match = usesCheckout.exec(line);
+      if (!match) continue;
       const ref = match[1];
       if (/^[0-9a-f]{40}$/i.test(ref)) {
         shas.add(ref.toLowerCase());
