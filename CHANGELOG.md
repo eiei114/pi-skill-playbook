@@ -78,3 +78,9 @@
 
 - Initial public release.
 
+## [1.5.4] - 2026-08-04
+
+### Changed
+
+- Bump package version for the Discord release webhook verification.
+
