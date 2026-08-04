@@ -43,13 +43,7 @@ jobs:
         run: npm ci
 
       - name: Validate package
-        shell: bash
-        run: |
-          npm run lint --if-present
-          npm run check --if-present
-          npm run typecheck --if-present
-          npm test --if-present
-          npm run validate:package --if-present
+        run: npm run ci
 
       - name: Skip already published version
         id: published
