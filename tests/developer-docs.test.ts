@@ -81,5 +81,13 @@ test("package.json ci script matches documented validation steps", () => {
 });
 
 test("publish workflow runs npm run ci before npm publish", () => {
-  assert.match(publishWorkflow, /npm run ci/);
+  const validationIndex = publishWorkflow.indexOf("run: npm run ci");
+  const publishIndex = publishWorkflow.indexOf("run: npm publish --access public");
+
+  assert.ok(validationIndex >= 0, "publish workflow should run npm run ci");
+  assert.ok(publishIndex >= 0, "publish workflow should run npm publish");
+  assert.ok(
+    validationIndex < publishIndex,
+    "publish workflow must validate before publishing",
+  );
 });
