@@ -8,6 +8,7 @@ const repoRoot = join(import.meta.dirname, "..");
 const packageJson = JSON.parse(readFileSync(join(repoRoot, "package.json"), "utf8"));
 const readme = readFileSync(join(repoRoot, "README.md"), "utf8");
 const ciWorkflow = readFileSync(join(repoRoot, ".github/workflows/ci.yml"), "utf8");
+const publishWorkflow = readFileSync(join(repoRoot, ".github/workflows/publish.yml"), "utf8");
 
 type NodeVersion = [major: number, minor: number, patch: number];
 
@@ -106,6 +107,18 @@ test("package.json ci script matches documented validation steps", () => {
   assert.match(ciScript, /test/);
   assert.match(ciScript, /validate:package/);
   assert.match(ciScript, /actions:check/);
+});
+
+test("publish workflow runs npm run ci before npm publish", () => {
+  const validationIndex = publishWorkflow.indexOf("run: npm run ci");
+  const publishIndex = publishWorkflow.indexOf("run: npm publish --access public");
+
+  assert.ok(validationIndex >= 0, "publish workflow should run npm run ci");
+  assert.ok(publishIndex >= 0, "publish workflow should run npm publish");
+  assert.ok(
+    validationIndex < publishIndex,
+    "publish workflow must validate before publishing",
+  );
 });
 
 test("checkout SHA scan ignores uses-like text inside run block scalars", () => {
