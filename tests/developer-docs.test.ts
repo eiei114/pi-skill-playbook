@@ -109,6 +109,12 @@ test("package.json ci script matches documented validation steps", () => {
   assert.match(ciScript, /actions:check/);
 });
 
+test("package.json files includes CHANGELOG and SECURITY for npm pack", () => {
+  const files = packageJson.files as string[];
+  assert.ok(files.includes("CHANGELOG.md"), "npm pack manifest must ship CHANGELOG.md");
+  assert.ok(files.includes("SECURITY.md"), "npm pack manifest must ship SECURITY.md");
+});
+
 test("publish workflow runs npm run ci before npm publish", () => {
   const validationIndex = publishWorkflow.indexOf("run: npm run ci");
   const publishIndex = publishWorkflow.indexOf("run: npm publish --access public");

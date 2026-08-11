@@ -27,7 +27,9 @@
     "docs/",
     "samples/",
     "LICENSE",
-    "README.md"
+    "README.md",
+    "CHANGELOG.md",
+    "SECURITY.md"
   ],
   "scripts": {
     "check": "tsc --noEmit",
