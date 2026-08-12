@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { execSync } from "node:child_process";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import test from "node:test";
@@ -107,6 +108,19 @@ test("package.json ci script matches documented validation steps", () => {
   assert.match(ciScript, /test/);
   assert.match(ciScript, /validate:package/);
   assert.match(ciScript, /actions:check/);
+});
+
+test("package.json files includes CHANGELOG and SECURITY for npm pack", () => {
+  const output = execSync("npm pack --dry-run --json", {
+    cwd: repoRoot,
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  const packs = JSON.parse(output) as Array<{ files: Array<{ path: string }> }>;
+  assert.equal(packs.length, 1, "npm pack --dry-run --json should return one package");
+  const paths = packs[0].files.map((file) => file.path);
+  assert.ok(paths.includes("CHANGELOG.md"), "npm pack manifest must ship CHANGELOG.md");
+  assert.ok(paths.includes("SECURITY.md"), "npm pack manifest must ship SECURITY.md");
 });
 
 test("publish workflow runs npm run ci before npm publish", () => {
