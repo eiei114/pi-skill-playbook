@@ -84,6 +84,12 @@ test("README documents npm run ci as the full validation entrypoint", () => {
   assert.match(developmentSection, /npm test/);
 });
 
+test("README CI badge links to ci.yml workflow", () => {
+  const ciBadgePattern =
+    /\[!\[CI\]\(https:\/\/github\.com\/eiei114\/pi-skill-playbook\/actions\/workflows\/ci\.yml\/badge\.svg\)\]\(https:\/\/github\.com\/eiei114\/pi-skill-playbook\/actions\/workflows\/ci\.yml\)/;
+  assert.match(readme, ciBadgePattern, "README CI badge must point to ci.yml, not auto-release.yml");
+});
+
 test("package.json engines.node matches CI node-version", () => {
   const workflowNodeVersion = /node-version:\s*(\d+)/.exec(ciWorkflow)?.[1];
   assert.ok(workflowNodeVersion, "ci.yml must declare node-version");
