@@ -1,5 +1,6 @@
 import { readdir, readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isNotFound } from "./fs-errors.js";
 import { parsePlaybookYaml } from "./validation.js";
 import type { LoadedPlaybook } from "./types.js";
 
@@ -11,9 +12,7 @@ export async function loadPlaybooks(cwd: string): Promise<LoadedPlaybook[]> {
   try {
     files = await readdir(dir);
   } catch (error) {
-    if (typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT") {
-      return [];
-    }
+    if (isNotFound(error)) return [];
     throw error;
   }
 
