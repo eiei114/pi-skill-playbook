@@ -1,5 +1,6 @@
 import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isNotFound } from "./fs-errors.js";
 import type { ActiveRunState, PlaybookRunState } from "./types.js";
 
 export const RUNS_DIR = ".pi/playbook-runs";
@@ -78,8 +79,4 @@ export function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return slug || "playbook-run";
-}
-
-function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
 }

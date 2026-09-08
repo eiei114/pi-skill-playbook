@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isNotFound } from "./fs-errors.js";
 import { RECORDS_DIR } from "./record-state.js";
 import { RUNS_DIR } from "./state.js";
 
@@ -61,9 +62,7 @@ export async function getGitignoreAdvisory(cwd: string): Promise<string | undefi
   try {
     gitignore = await readFile(join(cwd, ".gitignore"), "utf8");
   } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-      throw error;
-    }
+    if (!isNotFound(error)) throw error;
     // Missing .gitignore still needs advisory.
   }
 

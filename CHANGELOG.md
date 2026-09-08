@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Consolidate duplicated ENOENT detection into `src/fs-errors.ts` for run state, record state, playbook loading, and gitignore advisory paths.
+
 - Include `CHANGELOG.md` and `SECURITY.md` in the npm package `files` manifest so `npm pack` ships both alongside README and LICENSE.
 
 - Bump package version to `1.5.3` for the next patch release.

@@ -1,5 +1,6 @@
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { isNotFound } from "./fs-errors.js";
 import type { RecordSession } from "./record-types.js";
 
 export const RECORDS_DIR = ".pi/playbook-records";
@@ -65,8 +66,4 @@ export async function loadActiveRecordSession(cwd: string): Promise<RecordSessio
   const sessionId = await loadActiveRecordSessionId(cwd);
   if (!sessionId) return undefined;
   return loadRecordSession(cwd, sessionId);
-}
-
-function isNotFound(error: unknown): boolean {
-  return typeof error === "object" && error !== null && "code" in error && (error as { code?: string }).code === "ENOENT";
 }
