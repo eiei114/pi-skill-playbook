@@ -1,6 +1,6 @@
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { isNotFound } from "./fs-errors.js";
+import { readJsonIfExists } from "./fs-errors.js";
 import type { RecordSession } from "./record-types.js";
 
 export const RECORDS_DIR = ".pi/playbook-records";
@@ -32,12 +32,7 @@ export async function saveRecordSession(cwd: string, session: RecordSession): Pr
 }
 
 export async function loadRecordSession(cwd: string, sessionId: string): Promise<RecordSession | undefined> {
-  try {
-    return JSON.parse(await readFile(sessionFile(cwd, sessionId), "utf8")) as RecordSession;
-  } catch (error) {
-    if (isNotFound(error)) return undefined;
-    throw error;
-  }
+  return readJsonIfExists<RecordSession>(sessionFile(cwd, sessionId));
 }
 
 export async function setActiveRecordSession(cwd: string, sessionId: string): Promise<void> {
@@ -47,15 +42,10 @@ export async function setActiveRecordSession(cwd: string, sessionId: string): Pr
 }
 
 export async function loadActiveRecordSessionId(cwd: string): Promise<string | undefined> {
-  try {
-    const state = JSON.parse(await readFile(activeRecordFile(cwd), "utf8")) as { sessionId?: string };
-    return typeof state.sessionId === "string" && SESSION_ID_PATTERN.test(state.sessionId)
-      ? state.sessionId
-      : undefined;
-  } catch (error) {
-    if (isNotFound(error)) return undefined;
-    throw error;
-  }
+  const state = await readJsonIfExists<{ sessionId?: string }>(activeRecordFile(cwd));
+  return typeof state?.sessionId === "string" && SESSION_ID_PATTERN.test(state.sessionId)
+    ? state.sessionId
+    : undefined;
 }
 
 export async function clearActiveRecordSession(cwd: string): Promise<void> {

@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Centralize optional JSON state-file loading in `src/fs-errors.ts` so run and record state modules share identical missing-file and parse-error behavior.
+
 - Consolidate duplicated ENOENT detection into `src/fs-errors.ts` for run state, record state, playbook loading, and gitignore advisory paths.
 
 - Include `CHANGELOG.md` and `SECURITY.md` in the npm package `files` manifest so `npm pack` ships both alongside README and LICENSE.

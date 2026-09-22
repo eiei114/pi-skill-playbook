@@ -1,6 +1,6 @@
-import { mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { isNotFound } from "./fs-errors.js";
+import { isNotFound, readJsonIfExists } from "./fs-errors.js";
 import type { ActiveRunState, PlaybookRunState } from "./types.js";
 
 export const RUNS_DIR = ".pi/playbook-runs";
@@ -24,12 +24,7 @@ export async function saveRun(cwd: string, run: PlaybookRunState): Promise<void>
 }
 
 export async function loadRun(cwd: string, runId: string): Promise<PlaybookRunState | undefined> {
-  try {
-    return JSON.parse(await readFile(runFile(cwd, runId), "utf8")) as PlaybookRunState;
-  } catch (error) {
-    if (isNotFound(error)) return undefined;
-    throw error;
-  }
+  return readJsonIfExists<PlaybookRunState>(runFile(cwd, runId));
 }
 
 export async function listRunIds(cwd: string): Promise<string[]> {
@@ -53,13 +48,8 @@ export async function setActiveRun(cwd: string, runId: string): Promise<void> {
 }
 
 export async function loadActiveRunId(cwd: string): Promise<string | undefined> {
-  try {
-    const state = JSON.parse(await readFile(activeFile(cwd), "utf8")) as ActiveRunState;
-    return typeof state.runId === "string" ? state.runId : undefined;
-  } catch (error) {
-    if (isNotFound(error)) return undefined;
-    throw error;
-  }
+  const state = await readJsonIfExists<ActiveRunState>(activeFile(cwd));
+  return typeof state?.runId === "string" ? state.runId : undefined;
 }
 
 export async function clearActiveRun(cwd: string): Promise<void> {
