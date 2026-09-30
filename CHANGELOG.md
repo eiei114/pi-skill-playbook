@@ -84,6 +84,12 @@
 
 - Initial public release.
 
+## [1.5.7] - 2026-09-30
+
+### Changed
+
+- Update `@earendil-works/pi-*` dependencies to `0.99.1`.
+
 ## [1.5.4] - 2026-08-04
 
 ### Changed
