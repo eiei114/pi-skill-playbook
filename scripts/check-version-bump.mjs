@@ -14,6 +14,7 @@
  */
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { hasNoReleaseDeclaration } from "./pr-release-declaration.mjs";
 
 const VERSIONED_PATHS = ["extensions/", "src/"];
 
@@ -58,18 +59,6 @@ function hasMajorApproval() {
   }
 }
 
-function hasNoReleaseDeclaration() {
-  const eventPath = process.env.GITHUB_EVENT_PATH;
-  if (!eventPath || !existsSync(eventPath)) return false;
-  try {
-    const event = JSON.parse(readFileSync(eventPath, "utf8"));
-    const pr = event.pull_request ?? {};
-    return /^Release: none$/im.test(String(pr.body ?? ""));
-  } catch {
-    return false;
-  }
-}
-
 function isVersionedPath(file) {
   return VERSIONED_PATHS.some((path) => file === path || file.startsWith(path));
 }
@@ -101,7 +90,7 @@ if (versionDelta < 0) {
 }
 
 const versionedChanged = changed.some(isVersionedPath);
-const noReleaseDeclared = hasNoReleaseDeclaration();
+const noReleaseDeclared = await hasNoReleaseDeclaration();
 
 if (noReleaseDeclared && versionDelta > 0) {
   console.error("version:check fail - 'Release: none' conflicts with a package.json version bump.");
