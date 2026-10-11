@@ -82,6 +82,32 @@ test("summarizeCompletedRun includes playbook name and final outcome", async () 
   }
 });
 
+test("listCompletedRunSummaries resolves names for each run's playbook", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-multiple-playbooks-"));
+  try {
+    await writePlaybook(cwd);
+    const dir = join(cwd, ".pi", "playbooks");
+    const secondPlaybook = basePlaybookYaml
+      .replace("feature-development", "release-readiness")
+      .replace("Feature Development Playbook", "Release Readiness Playbook");
+    await writeFile(join(dir, "release-readiness.yml"), secondPlaybook, "utf8");
+
+    const firstRun = completedRun("feature-development-1", "2026-06-01T12:00:00.000Z");
+    const secondRun = completedRun("release-readiness-1", "2026-06-02T12:00:00.000Z");
+    secondRun.playbookId = "release-readiness";
+    await saveRun(cwd, firstRun);
+    await saveRun(cwd, secondRun);
+
+    const summaries = await listCompletedRunSummaries(cwd);
+    assert.deepEqual(summaries.map((summary) => summary.playbookName), [
+      "Release Readiness Playbook",
+      "Feature Development Playbook",
+    ]);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("finalOutcome falls back to complete when history is empty", () => {
   const run = completedRun("run-1", "2026-06-08T12:00:00.000Z");
   run.history = [];

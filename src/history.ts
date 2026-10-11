@@ -1,4 +1,4 @@
-import { findPlaybook } from "./playbooks.js";
+import { findPlaybook, loadPlaybooks } from "./playbooks.js";
 import { listRunIds, loadRun } from "./state.js";
 import type { PlaybookRunState } from "./types.js";
 
@@ -22,17 +22,33 @@ export async function listCompletedRuns(cwd: string): Promise<PlaybookRunState[]
 
 export async function summarizeCompletedRun(cwd: string, run: PlaybookRunState): Promise<CompletedRunSummary> {
   const playbook = await findPlaybook(cwd, run.playbookId);
-  return {
-    run,
-    playbookName: playbook?.definition.name ?? run.playbookId,
-    completedAt: run.updatedAt,
-    finalOutcome: finalOutcome(run),
-  };
+  return createCompletedRunSummary(run, playbook?.definition.name ?? run.playbookId);
+}
+
+export async function summarizeCompletedRuns(cwd: string, runs: PlaybookRunState[]): Promise<CompletedRunSummary[]> {
+  if (runs.length === 0) return [];
+
+  const playbooks = await loadPlaybooks(cwd);
+  const namesById = new Map<string, string>();
+  for (const playbook of playbooks) {
+    if (!namesById.has(playbook.definition.id)) namesById.set(playbook.definition.id, playbook.definition.name);
+  }
+
+  return runs.map((run) => createCompletedRunSummary(run, namesById.get(run.playbookId) ?? run.playbookId));
 }
 
 export async function listCompletedRunSummaries(cwd: string): Promise<CompletedRunSummary[]> {
   const runs = await listCompletedRuns(cwd);
-  return Promise.all(runs.map((run) => summarizeCompletedRun(cwd, run)));
+  return summarizeCompletedRuns(cwd, runs);
+}
+
+function createCompletedRunSummary(run: PlaybookRunState, playbookName: string): CompletedRunSummary {
+  return {
+    run,
+    playbookName,
+    completedAt: run.updatedAt,
+    finalOutcome: finalOutcome(run),
+  };
 }
 
 export function formatCompletedRunLine(summary: CompletedRunSummary): string {

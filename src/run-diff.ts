@@ -1,5 +1,4 @@
-import { listCompletedRuns, summarizeCompletedRun, finalOutcome } from "./history.js";
-import { loadRun } from "./state.js";
+import { listCompletedRuns, summarizeCompletedRuns, finalOutcome } from "./history.js";
 import type { PlaybookRunHistoryEntry, PlaybookRunState } from "./types.js";
 
 /** One side of a run-diff comparison: metadata and history for a completed run. */
@@ -146,9 +145,8 @@ export async function loadRecentRunDiffs(cwd: string, count?: number): Promise<R
   const runs = await listCompletedRuns(cwd);
   const maxRuns = count ?? runs.length;
   const limit = Math.min(maxRuns, runs.length);
-  const entries = await Promise.all(
-    runs.slice(0, limit).map((run) => toRunDiffEntryFromRun(cwd, run)),
-  );
+  const summaries = await summarizeCompletedRuns(cwd, runs.slice(0, limit));
+  const entries = summaries.map((summary) => toRunDiffEntry(summary.run, summary.playbookName));
   const results: RunDiffResult[] = [];
 
   for (let i = 0; i < entries.length - 1; i++) {
@@ -160,13 +158,4 @@ export async function loadRecentRunDiffs(cwd: string, count?: number): Promise<R
   }
 
   return results;
-}
-
-/**
- * Load a completed run from disk and convert it into a RunDiffEntry.
- * Returns undefined if the run is not completed or data is missing.
- */
-async function toRunDiffEntryFromRun(cwd: string, run: PlaybookRunState): Promise<RunDiffEntry | undefined> {
-  const summary = await summarizeCompletedRun(cwd, run);
-  return toRunDiffEntry(run, summary.playbookName);
 }

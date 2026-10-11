@@ -14,6 +14,7 @@
  */
 import { execSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { hasNoReleaseDeclaration } from "./pr-release-declaration.mjs";
 
 const VERSIONED_PATHS = ["extensions/", "src/"];
 
@@ -89,12 +90,22 @@ if (versionDelta < 0) {
 }
 
 const versionedChanged = changed.some(isVersionedPath);
+const noReleaseDeclared = await hasNoReleaseDeclaration();
+
+if (noReleaseDeclared && versionDelta > 0) {
+  console.error("version:check fail - 'Release: none' conflicts with a package.json version bump.");
+  process.exit(1);
+}
 
 if (versionedChanged && versionDelta === 0) {
-  console.error(
-    `version:check fail - changes under ${VERSIONED_PATHS.join(", ")} require a package.json version bump and CHANGELOG.md entry.`,
-  );
-  process.exit(1);
+  if (!noReleaseDeclared) {
+    console.error(
+      `version:check fail - changes under ${VERSIONED_PATHS.join(", ")} require a package.json version bump and CHANGELOG.md entry, or an explicit 'Release: none' PR declaration.`,
+    );
+    process.exit(1);
+  }
+  console.log(`version:check ok - no release declared for versioned source changes (${baseVersion})`);
+  process.exit(0);
 }
 
 if (versionDelta > 0) {

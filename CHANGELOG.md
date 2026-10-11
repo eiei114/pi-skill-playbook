@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Batch completed-history and recent run-diff playbook lookups to avoid repeated loading.
+
 - Centralize optional JSON state-file loading in `src/fs-errors.ts` so run and record state modules share identical missing-file and parse-error behavior.
 
 - Consolidate duplicated ENOENT detection into `src/fs-errors.ts` for run state, record state, playbook loading, and gitignore advisory paths.
