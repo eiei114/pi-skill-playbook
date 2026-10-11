@@ -58,6 +58,18 @@ function hasMajorApproval() {
   }
 }
 
+function hasNoReleaseDeclaration() {
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath || !existsSync(eventPath)) return false;
+  try {
+    const event = JSON.parse(readFileSync(eventPath, "utf8"));
+    const pr = event.pull_request ?? {};
+    return /^Release: none$/im.test(String(pr.body ?? ""));
+  } catch {
+    return false;
+  }
+}
+
 function isVersionedPath(file) {
   return VERSIONED_PATHS.some((path) => file === path || file.startsWith(path));
 }
@@ -89,12 +101,22 @@ if (versionDelta < 0) {
 }
 
 const versionedChanged = changed.some(isVersionedPath);
+const noReleaseDeclared = hasNoReleaseDeclaration();
+
+if (noReleaseDeclared && versionDelta > 0) {
+  console.error("version:check fail - 'Release: none' conflicts with a package.json version bump.");
+  process.exit(1);
+}
 
 if (versionedChanged && versionDelta === 0) {
-  console.error(
-    `version:check fail - changes under ${VERSIONED_PATHS.join(", ")} require a package.json version bump and CHANGELOG.md entry.`,
-  );
-  process.exit(1);
+  if (!noReleaseDeclared) {
+    console.error(
+      `version:check fail - changes under ${VERSIONED_PATHS.join(", ")} require a package.json version bump and CHANGELOG.md entry, or an explicit 'Release: none' PR declaration.`,
+    );
+    process.exit(1);
+  }
+  console.log(`version:check ok - no release declared for versioned source changes (${baseVersion})`);
+  process.exit(0);
 }
 
 if (versionDelta > 0) {
