@@ -1,6 +1,6 @@
 {
   "name": "pi-skill-playbook",
-  "version": "1.5.7",
+  "version": "1.5.8",
   "type": "module",
   "description": "Pi extension for passive, human-mediated Agent Skill playbooks.",
   "keywords": [
@@ -35,11 +35,12 @@
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
     "test": "node --test --import tsx tests/*.test.ts",
+    "smoke:pi": "node scripts/pi-sdk-smoke.mjs",
     "build": "npm run check",
     "validate:package": "npm pack --dry-run",
     "actions:check": "node scripts/check-actions-pinned.mjs",
     "version:check": "node scripts/check-version-bump.mjs",
-    "ci": "npm run typecheck && npm test && npm run validate:package && npm run actions:check"
+    "ci": "npm run typecheck && npm test && npm run smoke:pi && npm run validate:package && npm run actions:check"
   },
   "pi": {
     "extensions": [
@@ -50,6 +51,10 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
+    "@earendil-works/pi-agent-core": "1.1.0",
+    "@earendil-works/pi-ai": "1.1.0",
+    "@earendil-works/pi-coding-agent": "1.1.0",
+    "@earendil-works/pi-tui": "1.1.0",
     "@types/node": "^24.0.0",
     "tsx": "^4.23.13",
     "typescript": "^5.8.0"

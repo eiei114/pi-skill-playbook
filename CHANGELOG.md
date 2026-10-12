@@ -4,6 +4,8 @@
 
 ### Changed
 
+- Pin Pi SDK 1.1.0 for development, use its provider-authenticated `modelRegistry.streamSimple()` API for import-web drafts, and verify actual extension behavior in CI.
+
 - Batch completed-history and recent run-diff playbook lookups to avoid repeated loading.
 
 - Centralize optional JSON state-file loading in `src/fs-errors.ts` so run and record state modules share identical missing-file and parse-error behavior.
