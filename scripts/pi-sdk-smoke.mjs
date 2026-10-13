@@ -2,7 +2,7 @@ import { spawn, spawnSync } from "node:child_process";
 import { createServer } from "node:http";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { parse as parseYaml } from "yaml";
 import {
   behaviorAssertions,
@@ -13,7 +13,9 @@ import {
 } from "./pi-sdk-smoke-contract.mjs";
 
 const root = resolve(import.meta.dirname, "..");
-const reportPath = resolve(root, "docs/verification/pi-sdk-smoke.json");
+const reportPath = process.argv.includes("--update-curated-report")
+  ? resolve(root, "docs/verification/pi-sdk-smoke.json")
+  : resolve(root, ".tmp/pi-sdk-smoke.json");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
 const manifestVersions = Object.fromEntries(Object.entries(SDK_VERSIONS).map(([name, expected]) => {
@@ -399,7 +401,7 @@ try {
       || (item.name === "extension_load" && !item.assertions.some((assertion) => assertion.id === "extension_registered" && assertion.passed))).length,
     cases: cases.map(({ _unhandled_error, _extension_load_error, ...item }) => item),
   };
-  mkdirSync(resolve(root, "docs/verification"), { recursive: true });
+  mkdirSync(dirname(reportPath), { recursive: true });
   writeFileSync(reportPath, `${JSON.stringify(report, null, 2)}\n`);
   console.log(JSON.stringify({
     verification_contract: VERIFICATION_CONTRACT,
