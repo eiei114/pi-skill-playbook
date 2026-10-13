@@ -1,33 +1,11 @@
-import { createRequire } from "node:module";
+import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { AssistantMessageEvent } from "@earendil-works/pi-ai";
 import type { ModelDraftRequest, ModelDrafter } from "../src/import-web-draft.js";
 import { buildDraftPrompt } from "../src/import-web-draft.js";
 
 const MODEL_DRAFT_TIMEOUT_MS = 120_000;
 
-type ModelLike = {
-  provider: string;
-  id: string;
-};
-
-type ModelRegistryLike = {
-  getApiKeyAndHeaders(model: ModelLike): Promise<
-    | { ok: true; apiKey?: string; headers?: Record<string, string> }
-    | { ok: false; error: string }
-  >;
-};
-
-type ImportWebModelContext = {
-  model: ModelLike | undefined;
-  modelRegistry: ModelRegistryLike;
-};
-
-type PiAiModule = {
-  streamSimple: (
-    model: ModelLike,
-    context: { messages: Array<{ role: string; content: string }> },
-    options?: { apiKey?: string; headers?: Record<string, string>; maxTokens?: number },
-  ) => AsyncIterable<{ type: string; delta?: string; error?: { message?: string } }>;
-};
+type ImportWebModelContext = Pick<ExtensionCommandContext, "model" | "modelRegistry">;
 
 export function createModelDrafterFromContext(ctx: ImportWebModelContext): ModelDrafter | undefined {
   if (!ctx.model) return undefined;
@@ -42,18 +20,10 @@ async function draftWithActiveModel(ctx: ImportWebModelContext, request: ModelDr
     throw new Error("No active Pi model is configured for import-web drafting.");
   }
 
-  const auth = await ctx.modelRegistry.getApiKeyAndHeaders(model);
-  if (!auth.ok) {
-    throw new Error(auth.error);
-  }
-
   const prompt = buildDraftPrompt(request);
-  const piAi = await loadPiAiModule();
-  const stream = piAi.streamSimple(model, {
-    messages: [{ role: "user", content: prompt }],
+  const stream = ctx.modelRegistry.streamSimple(model, {
+    messages: [{ role: "user", content: prompt, timestamp: Date.now() }],
   }, {
-    apiKey: auth.apiKey,
-    headers: auth.headers,
     maxTokens: 4096,
   });
 
@@ -61,7 +31,7 @@ async function draftWithActiveModel(ctx: ImportWebModelContext, request: ModelDr
 }
 
 async function consumeModelStream(
-  stream: AsyncIterable<{ type: string; delta?: string; error?: { message?: string } }>,
+  stream: AsyncIterable<AssistantMessageEvent>,
   timeoutMs: number,
 ): Promise<string> {
   const iterator = stream[Symbol.asyncIterator]();
@@ -92,7 +62,7 @@ async function consumeModelStream(
         text += event.delta ?? "";
       }
       if (event.type === "error") {
-        throw new Error(event.error?.message ?? "Model drafting failed.");
+        throw new Error(event.error.errorMessage ?? "Model drafting failed.");
       }
     }
   } finally {
@@ -103,11 +73,4 @@ async function consumeModelStream(
     throw new Error("Model drafting returned an empty response.");
   }
   return text;
-}
-
-async function loadPiAiModule(): Promise<PiAiModule> {
-  const require = createRequire(import.meta.url);
-  const codingAgentEntry = require.resolve("@earendil-works/pi-coding-agent");
-  const piAiEntry = require.resolve("@earendil-works/pi-ai", { paths: [codingAgentEntry] });
-  return import(piAiEntry) as Promise<PiAiModule>;
 }
