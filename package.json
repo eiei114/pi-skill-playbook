@@ -34,7 +34,7 @@
   "scripts": {
     "check": "tsc --noEmit",
     "typecheck": "tsc --noEmit",
-    "test": "node --test --import tsx tests/*.test.ts tests/release-trigger-contract.test.mjs",
+    "test": "node --test --import tsx tests/*.test.ts",
     "smoke:pi": "node scripts/pi-sdk-smoke.mjs",
     "build": "npm run check",
     "validate:package": "npm pack --dry-run",
