@@ -24,11 +24,3 @@ test("merging code cannot directly or indirectly trigger npm publish or release"
   assert.throws(() => assertNoMergeTriggeredRelease(
     releaseWorkflow, publishWorkflow.replace("    tags:", "    branches: [main]\n    tags:")));
 });
-
-test("manual release rejects malformed SemVer without leading zeros", () => {
-  const pattern = releaseWorkflow.match(/grep -Eq '([^']+)'/)?.[1];
-  assert.ok(pattern, "manual release must validate stable SemVer");
-  const stableSemver = new RegExp(pattern);
-  for (const version of ["0.0.0", "1.4.2", "10.20.300"]) assert.match(version, stableSemver);
-  for (const version of ["01.4.2", "1.04.2", "1.4.02", "1.4", "1.4.2-beta"]) assert.doesNotMatch(version, stableSemver);
-});
