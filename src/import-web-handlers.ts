@@ -9,7 +9,8 @@ import {
   type ModelDraftRequest,
   type ModelDrafter,
 } from "./import-web-draft.js";
-import { createSearchProviderFromEnv, type FetchLike, type SearchProviderAdapter, type SearchResult } from "./search-provider.js";
+import type { FetchLike } from "./fetch-with-timeout.js";
+import { createSearchProviderFromEnv, type SearchProviderAdapter, type SearchResult } from "./search-provider.js";
 import { fetchUrlContents, type FetchedUrlContent } from "./url-content.js";
 import { normalizeSkillCommandName } from "./validation.js";
 

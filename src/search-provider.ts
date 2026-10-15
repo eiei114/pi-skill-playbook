@@ -1,4 +1,7 @@
 import { DEFAULT_FETCH_TIMEOUT_MS, fetchWithTimeout } from "./fetch-with-timeout.js";
+import type { FetchLike } from "./fetch-with-timeout.js";
+
+export type { FetchLike } from "./fetch-with-timeout.js";
 
 export interface SearchResult {
   url: string;
@@ -10,8 +13,6 @@ export interface SearchProviderAdapter {
   readonly name: string;
   search(query: string, options?: { count?: number }): Promise<SearchResult[]>;
 }
-
-export type FetchLike = typeof fetch;
 
 const BRAVE_SEARCH_ENDPOINT = "https://api.search.brave.com/res/v1/web/search";
 

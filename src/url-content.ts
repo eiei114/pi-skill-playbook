@@ -1,5 +1,5 @@
 import { DEFAULT_FETCH_TIMEOUT_MS, fetchWithTimeout } from "./fetch-with-timeout.js";
-import type { FetchLike } from "./search-provider.js";
+import type { FetchLike } from "./fetch-with-timeout.js";
 
 export interface FetchedUrlContent {
   url: string;

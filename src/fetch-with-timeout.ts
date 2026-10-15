@@ -1,4 +1,4 @@
-import type { FetchLike } from "./search-provider.js";
+export type FetchLike = typeof fetch;
 
 export const DEFAULT_FETCH_TIMEOUT_MS = 15_000;
 
