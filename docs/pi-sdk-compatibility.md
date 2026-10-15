@@ -1,11 +1,11 @@
-# Pi SDK 1.1.0 compatibility
+# Pi SDK 1.2.0 compatibility
 
 This package is verified with `@earendil-works/pi-agent-core`, `pi-ai`,
-`pi-coding-agent`, and `pi-tui` pinned to `1.1.0` for development and tests.
+`pi-coding-agent`, and `pi-tui` pinned to `1.2.0` for development and tests.
 The published peer dependency on `pi-coding-agent` remains `*`; the SDK pins
 are not runtime dependency or peer-range changes. The compatibility baseline
 and shared smoke contract are documented in the merged
-[pi-extension-template baseline PR #130](https://github.com/eiei114/pi-extension-template/pull/130).
+[pi-extension-template baseline PR #131](https://github.com/eiei114/pi-extension-template/pull/131).
 
 ## API compatibility finding
 
@@ -15,7 +15,14 @@ uses `ctx.modelRegistry.streamSimple()`, the documented provider-neutral nested
 model API, instead of importing the old global `streamSimple` function from
 `pi-ai`. The SDK resolves request-time authentication and headers through the
 active registry. This removes the local auth/header mirror and avoids coupling
-to deprecated `pi-ai` compatibility exports. Review of the pinned upstream
+to deprecated `pi-ai` compatibility exports. The [Pi 1.2.0 release notes](https://github.com/earendil-works/pi/releases/tag/v1.2.0) change
+`before_agent_start` events to a `messageType` union: user events contain
+`prompt`/`images`, while custom events contain `message` and no `prompt`.
+Handlers that read user-only fields must first check
+`event.messageType === "user"`. This extension's handler only reads the shared
+`systemPrompt`, so no event migration is needed. It also does not call
+`ctx.isIdle()` or `sendUserMessage()` during startup, when the session is busy
+and sends require an explicit `deliverAs` value. Review of the pinned upstream
 extension and `pi-ai` API documentation found no other deprecated call sites.
 
 ## Functional verification boundary

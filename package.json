@@ -1,6 +1,6 @@
 {
   "name": "pi-skill-playbook",
-  "version": "1.5.9",
+  "version": "1.5.10",
   "type": "module",
   "description": "Pi extension for passive, human-mediated Agent Skill playbooks.",
   "keywords": [
@@ -51,10 +51,10 @@
     "yaml": "^2.9.1"
   },
   "devDependencies": {
-    "@earendil-works/pi-agent-core": "1.1.0",
-    "@earendil-works/pi-ai": "1.1.0",
-    "@earendil-works/pi-coding-agent": "1.1.0",
-    "@earendil-works/pi-tui": "1.1.0",
+    "@earendil-works/pi-agent-core": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@earendil-works/pi-tui": "1.2.0",
     "@types/node": "^24.0.0",
     "tsx": "^4.23.13",
     "typescript": "^5.8.0"
