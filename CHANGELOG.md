@@ -4,9 +4,13 @@
 
 ### Changed
 
+- Pin the Pi SDK development/test packages to 1.2.0 and verify this extension's import, handled-error, reload, and native-shell behavior against the actual Pi host; its `before_agent_start` handler only reads `systemPrompt`, so the v1.2.0 user/custom message union requires no migration here.
+
+- Bump package version to `1.5.10` for the Pi SDK compatibility update.
+
 - Move the shared `FetchLike` contract into `src/fetch-with-timeout.ts`, keeping search and URL fetching independent of each other's types.
 
-- Pin Pi SDK 1.1.0 for development, use its provider-authenticated `modelRegistry.streamSimple()` API for import-web drafts, and verify actual extension behavior in CI.
+- Use the provider-authenticated `modelRegistry.streamSimple()` API for import-web drafts and verify actual extension behavior in CI.
 
 - Batch completed-history and recent run-diff playbook lookups to avoid repeated loading.
 

@@ -47,10 +47,10 @@ const input = (overrides: Partial<BehaviorInput> = {}): BehaviorInput => ({
 test("SDK smoke contract uses the frozen SDK dictionary and handles LF/CRLF RPC lines", () => {
   assert.equal(VERIFICATION_CONTRACT, "pi-sdk-behavior-v2");
   assert.deepEqual(SDK_VERSIONS, {
-    "@earendil-works/pi-agent-core": "1.1.0",
-    "@earendil-works/pi-ai": "1.1.0",
-    "@earendil-works/pi-coding-agent": "1.1.0",
-    "@earendil-works/pi-tui": "1.1.0",
+    "@earendil-works/pi-agent-core": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/pi-coding-agent": "1.2.0",
+    "@earendil-works/pi-tui": "1.2.0",
   });
   assert.deepEqual(parseJsonLines(`not-json\r\n${JSON.stringify(prompt)}\n\n`), [prompt]);
 });
@@ -103,15 +103,15 @@ test("feature paths reject agent-start events and host shell requires exact pinn
     featureArtifact: savedArtifact,
   }))[2].passed, false);
   assert.equal(behaviorAssertions("host_shell", input({
-    shell_stdout: "1.1.0\r\n",
+    shell_stdout: "1.2.0\r\n",
     shell_stderr: "",
-    expectedVersion: "1.1.0",
+    expectedVersion: "1.2.0",
   }))[0].passed, true);
-  for (const output of ["", "11.1.0", "1.1.0 with warning", "1.0.0"]) {
+  for (const output of ["", "11.2.0", "1.2.0 with warning", "1.0.0"]) {
     assert.equal(behaviorAssertions("host_shell", input({
       shell_stdout: output,
       shell_stderr: "",
-      expectedVersion: "1.1.0",
+      expectedVersion: "1.2.0",
     }))[0].passed, false);
   }
 });
