@@ -1,6 +1,7 @@
-import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { readdir, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { isNotFound, readJsonIfExists } from "./fs-errors.js";
+import { writeJsonFile } from "./json-files.js";
 import type { ActiveRunState, PlaybookRunState } from "./types.js";
 
 export const RUNS_DIR = ".pi/playbook-runs";
@@ -19,8 +20,7 @@ export function activeFile(cwd: string): string {
 }
 
 export async function saveRun(cwd: string, run: PlaybookRunState): Promise<void> {
-  await mkdir(runsDir(cwd), { recursive: true });
-  await writeFile(runFile(cwd, run.runId), `${JSON.stringify(run, null, 2)}\n`, "utf8");
+  await writeJsonFile(runFile(cwd, run.runId), run);
 }
 
 export async function loadRun(cwd: string, runId: string): Promise<PlaybookRunState | undefined> {
@@ -42,9 +42,8 @@ export async function listRunIds(cwd: string): Promise<string[]> {
 }
 
 export async function setActiveRun(cwd: string, runId: string): Promise<void> {
-  await mkdir(runsDir(cwd), { recursive: true });
   const state: ActiveRunState = { runId };
-  await writeFile(activeFile(cwd), `${JSON.stringify(state, null, 2)}\n`, "utf8");
+  await writeJsonFile(activeFile(cwd), state);
 }
 
 export async function loadActiveRunId(cwd: string): Promise<string | undefined> {

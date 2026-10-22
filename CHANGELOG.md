@@ -4,9 +4,13 @@
 
 ### Changed
 
+- Centralize pretty-printed JSON state writes for playbook runs and recording sessions in `src/json-files.ts`.
+
 - Pin the Pi SDK development/test packages to 1.2.0 and verify this extension's import, handled-error, reload, and native-shell behavior against the actual Pi host; its `before_agent_start` handler only reads `systemPrompt`, so the v1.2.0 user/custom message union requires no migration here.
 
 - Bump package version to `1.5.10` for the Pi SDK compatibility update.
+
+- Bump package version to `1.5.11` for the shared JSON state writer refactor.
 
 - Move the shared `FetchLike` contract into `src/fetch-with-timeout.ts`, keeping search and URL fetching independent of each other's types.
 

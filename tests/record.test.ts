@@ -12,9 +12,11 @@ import {
   renderRecordStatus,
 } from "../src/record.js";
 import {
+  activeRecordFile,
   clearActiveRecordSession,
   loadActiveRecordSession,
   saveRecordSession,
+  sessionFile,
   setActiveRecordSession,
 } from "../src/record-state.js";
 import { handleRecordCommand } from "../src/record-handlers.js";
@@ -79,6 +81,11 @@ test("record session persistence round-trips", async () => {
     const session = markSkill(createRecordSession("persisted", "Persisted"), "grill-with-docs");
     await saveRecordSession(cwd, session);
     await setActiveRecordSession(cwd, session.sessionId);
+    assert.equal(await readFile(sessionFile(cwd, session.sessionId), "utf8"), `${JSON.stringify(session, null, 2)}\n`);
+    assert.equal(
+      await readFile(activeRecordFile(cwd), "utf8"),
+      `${JSON.stringify({ sessionId: session.sessionId }, null, 2)}\n`,
+    );
     const loaded = await loadActiveRecordSession(cwd);
     assert.equal(loaded?.playbookId, "persisted");
     assert.equal(loaded?.currentStepId, "grill-with-docs");
