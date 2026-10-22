@@ -1,6 +1,7 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { rm } from "node:fs/promises";
 import { join } from "node:path";
 import { readJsonIfExists } from "./fs-errors.js";
+import { writeJsonFile } from "./json-files.js";
 import type { RecordSession } from "./record-types.js";
 
 export const RECORDS_DIR = ".pi/playbook-records";
@@ -27,8 +28,7 @@ export function activeRecordFile(cwd: string): string {
 }
 
 export async function saveRecordSession(cwd: string, session: RecordSession): Promise<void> {
-  await mkdir(recordsDir(cwd), { recursive: true });
-  await writeFile(sessionFile(cwd, session.sessionId), `${JSON.stringify(session, null, 2)}\n`, "utf8");
+  await writeJsonFile(sessionFile(cwd, session.sessionId), session);
 }
 
 export async function loadRecordSession(cwd: string, sessionId: string): Promise<RecordSession | undefined> {
@@ -37,8 +37,7 @@ export async function loadRecordSession(cwd: string, sessionId: string): Promise
 
 export async function setActiveRecordSession(cwd: string, sessionId: string): Promise<void> {
   assertValidSessionId(sessionId);
-  await mkdir(recordsDir(cwd), { recursive: true });
-  await writeFile(activeRecordFile(cwd), `${JSON.stringify({ sessionId }, null, 2)}\n`, "utf8");
+  await writeJsonFile(activeRecordFile(cwd), { sessionId });
 }
 
 export async function loadActiveRecordSessionId(cwd: string): Promise<string | undefined> {
