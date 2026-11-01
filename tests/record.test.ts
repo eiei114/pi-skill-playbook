@@ -78,6 +78,9 @@ test("renderRecordStatus shows pending branch state", () => {
 test("record session persistence round-trips", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-record-state-"));
   try {
+    await clearActiveRecordSession(cwd);
+    assert.equal(await loadActiveRecordSession(cwd), undefined);
+
     const session = markSkill(createRecordSession("persisted", "Persisted"), "grill-with-docs");
     await saveRecordSession(cwd, session);
     await setActiveRecordSession(cwd, session.sessionId);
@@ -91,6 +94,7 @@ test("record session persistence round-trips", async () => {
     assert.equal(loaded?.currentStepId, "grill-with-docs");
     await clearActiveRecordSession(cwd);
     assert.equal(await loadActiveRecordSession(cwd), undefined);
+    await clearActiveRecordSession(cwd);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }

@@ -1,8 +1,9 @@
-import { readdir, rm } from "node:fs/promises";
+import { readdir } from "node:fs/promises";
 import { join } from "node:path";
+import { clearActiveId, loadActiveId, saveActiveId } from "./active-state.js";
 import { isNotFound, readJsonIfExists } from "./fs-errors.js";
 import { writeJsonFile } from "./json-files.js";
-import type { ActiveRunState, PlaybookRunState } from "./types.js";
+import type { PlaybookRunState } from "./types.js";
 
 export const RUNS_DIR = ".pi/playbook-runs";
 const ACTIVE_FILE = "active.json";
@@ -42,17 +43,15 @@ export async function listRunIds(cwd: string): Promise<string[]> {
 }
 
 export async function setActiveRun(cwd: string, runId: string): Promise<void> {
-  const state: ActiveRunState = { runId };
-  await writeJsonFile(activeFile(cwd), state);
+  await saveActiveId(activeFile(cwd), "runId", runId);
 }
 
 export async function loadActiveRunId(cwd: string): Promise<string | undefined> {
-  const state = await readJsonIfExists<ActiveRunState>(activeFile(cwd));
-  return typeof state?.runId === "string" ? state.runId : undefined;
+  return loadActiveId(activeFile(cwd), "runId");
 }
 
 export async function clearActiveRun(cwd: string): Promise<void> {
-  await rm(activeFile(cwd), { force: true });
+  await clearActiveId(activeFile(cwd));
 }
 
 export function createRunId(playbookId: string, runName?: string): string {
