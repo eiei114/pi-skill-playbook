@@ -25,6 +25,9 @@ test("slugifies run names", () => {
 test("saves, loads, and clears active run", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-test-"));
   try {
+    await clearActiveRun(cwd);
+    assert.equal(await loadActiveRunId(cwd), undefined);
+
     const now = new Date().toISOString();
     const run: PlaybookRunState = {
       runId: "run-1",
@@ -46,6 +49,7 @@ test("saves, loads, and clears active run", async () => {
 
     await clearActiveRun(cwd);
     assert.equal(await loadActiveRunId(cwd), undefined);
+    await clearActiveRun(cwd);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
