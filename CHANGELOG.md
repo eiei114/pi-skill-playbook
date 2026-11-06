@@ -4,6 +4,10 @@
 
 ### Changed
 
+- Pin the Pi SDK development/test packages to 1.5.0 and verify the extension's real-host import-web, handled-error, reload, and native-shell behavior against the actual Pi host.
+
+- Bump package version to `1.5.13` for Pi SDK 1.5.0 compatibility.
+
 - Centralize active run and recording-session pointer persistence in `src/active-state.ts`, preserving their distinct ID validation.
 
 - Bump package version to `1.5.12` for the active-pointer refactor.
