@@ -182,6 +182,26 @@ test("loadRunSafe rejects parseable JSON with the wrong run-state shape and keep
   }
 });
 
+test("loadRunSafe rejects a stored runId that points at another healthy run without changing it", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-run-id-mismatch-"));
+  try {
+    const healthy = run("healthy-run", "active");
+    await saveRun(cwd, healthy);
+    const healthyPath = runFile(cwd, healthy.runId);
+    const healthyBytes = await readFile(healthyPath, "utf8");
+    await writeFile(runFile(cwd, "broken-run"), JSON.stringify({ ...healthy, currentStep: "released" }), "utf8");
+
+    const safe = await loadRunSafe(cwd, "broken-run");
+
+    assert.equal(safe.path, runFile(cwd, "broken-run"));
+    assert.ok(safe.error);
+    assert.match(safe.error.message, /field "runId" is "healthy-run" instead of "broken-run"/);
+    assert.equal(await readFile(healthyPath, "utf8"), healthyBytes);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("loadActiveRunIdSafe ignores a pointer with no usable runId", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-active-shape-"));
   try {

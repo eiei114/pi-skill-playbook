@@ -46,7 +46,14 @@ export async function loadRunSafe(cwd: string, runId: string): Promise<SafeRunLo
   if (result.value === undefined) return { run: undefined };
   // Parseable JSON is not enough: a hand-edited file can still lack the fields
   // every listing reads, which used to throw inside the history sort.
-  const mismatch = describeRunShapeMismatch(result.value);
+  let mismatch = describeRunShapeMismatch(result.value);
+  if (!mismatch) {
+    const storedRunId = (result.value as PlaybookRunState).runId;
+    if (storedRunId !== runId) {
+      const actual = typeof storedRunId === "string" ? JSON.stringify(storedRunId) : describeJsonType(storedRunId);
+      mismatch = `field "runId" is ${actual} instead of ${JSON.stringify(runId)}, which the file name requires`;
+    }
+  }
   if (mismatch) {
     const problem = stateShapeProblem(path, mismatch);
     return { error: new Error(problem.message, { cause: problem.error }), path };
