@@ -1,7 +1,7 @@
 import { readdir } from "node:fs/promises";
 import { join } from "node:path";
 import { clearActiveId, loadActiveId, saveActiveId } from "./active-state.js";
-import { isNotFound, readJsonIfExists } from "./fs-errors.js";
+import { isNotFound, readJsonResult } from "./fs-errors.js";
 import { writeJsonFile } from "./json-files.js";
 import type { PlaybookRunState } from "./types.js";
 
@@ -25,7 +25,59 @@ export async function saveRun(cwd: string, run: PlaybookRunState): Promise<void>
 }
 
 export async function loadRun(cwd: string, runId: string): Promise<PlaybookRunState | undefined> {
-  return readJsonIfExists<PlaybookRunState>(runFile(cwd, runId));
+  const result = await loadRunSafe(cwd, runId);
+  if (result.error) throw result.error;
+  return result.run;
+}
+
+export type SafeRunLoad =
+  | { run: PlaybookRunState | undefined; error?: undefined; path?: undefined }
+  | { run?: undefined; error: Error; path: string };
+
+/**
+ * Load one run file without throwing. A missing file yields `{ run: undefined }`;
+ * a damaged file yields `{ error, path }` whose message names the path so a
+ * listing can skip it and report it while healthy runs stay usable.
+ */
+export async function loadRunSafe(cwd: string, runId: string): Promise<SafeRunLoad> {
+  const path = runFile(cwd, runId);
+  const result = await readJsonResult<PlaybookRunState>(path);
+  if (!result.problem) return { run: result.value };
+  return { error: new Error(result.problem.message, { cause: result.problem.error }), path: result.problem.path };
+}
+
+export interface RunScan {
+  /** Readable run states; damaged or missing files are omitted. */
+  runs: PlaybookRunState[];
+  /** One actionable message per damaged run file, naming the path. */
+  problems: string[];
+}
+
+/**
+ * Load every run-state file, tolerating damaged ones. Callers decide which
+ * status they need, so both history and active-run selection share one pass.
+ */
+export async function scanRuns(cwd: string): Promise<RunScan> {
+  const ids = await listRunIds(cwd);
+  const loads = await Promise.all(ids.map((id) => loadRunSafe(cwd, id)));
+  const runs: PlaybookRunState[] = [];
+  const problems: string[] = [];
+  for (const load of loads) {
+    if (load.error) {
+      problems.push(load.error.message);
+      continue;
+    }
+    if (load.run) runs.push(load.run);
+  }
+  return { runs, problems };
+}
+
+/** Read the active pointer without throwing; a damaged pointer reports its path. */
+export async function loadActiveRunIdSafe(cwd: string): Promise<{ runId?: string; problem?: string }> {
+  const result = await readJsonResult<Record<string, unknown>>(activeFile(cwd));
+  if (result.problem) return { problem: result.problem.message };
+  const runId = result.value?.runId;
+  return typeof runId === "string" ? { runId } : {};
 }
 
 export async function listRunIds(cwd: string): Promise<string[]> {
