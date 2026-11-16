@@ -42,6 +42,15 @@ export function stateFileProblem(path: string, error: unknown): JsonReadProblem 
   return { path, error, message: `Playbook state file "${path}" cannot be read: ${describeReadFailure(error)}. The file was left unchanged; repair or delete it.` };
 }
 
+/**
+ * Build the actionable message used when a state file parses as JSON but holds
+ * the wrong shape, which callers cannot use any better than unparsable content.
+ */
+export function stateShapeProblem(path: string, detail: string): JsonReadProblem {
+  const error = new Error(`Playbook state file "${path}" has an unexpected shape: ${detail}`);
+  return { path, error, message: `Playbook state file "${path}" cannot be used: ${detail}. The file was left unchanged; repair or delete it.` };
+}
+
 function describeReadFailure(error: unknown): string {
   if (error instanceof SyntaxError) return "invalid JSON";
   const code = typeof error === "object" && error !== null && "code" in error ? (error as { code?: string }).code : undefined;

@@ -4,7 +4,7 @@
 
 ### Changed
 
-- Tolerate a corrupt run-state file: a damaged `.pi/playbook-runs/<id>.json` (truncated or hand-edited JSON) no longer breaks `/playbook:history`, `/playbook:rundiff`, the run-selection UI, or the `session_start` hook. Healthy runs are still listed, each damaged file is reported once by path with an actionable message, and no state file is deleted or rewritten automatically. Direct single-run loads (`/playbook:status`, `/playbook:done`) now fail with the same path-named message instead of a bare `SyntaxError`.
+- Tolerate a corrupt run-state file: a damaged `.pi/playbook-runs/<id>.json` (truncated JSON, hand-edited JSON, or the wrong shape such as a non-string `updatedAt` or a non-array `history`) no longer breaks `/playbook:history`, `/playbook:rundiff`, the run-selection UI, or the `session_start` hook. Healthy runs are still listed, each damaged file is reported once by path with an actionable message, and no state file is deleted or rewritten automatically. Direct single-run loads (`/playbook:status`, `/playbook:done`) now fail with the same path-named message instead of a bare `SyntaxError`.
 
 - Bump package version to `1.5.14` for the corrupt run-state tolerance.
 

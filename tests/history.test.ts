@@ -130,6 +130,59 @@ test("listCompletedRuns keeps healthy runs when one run file is corrupt", async 
   }
 });
 
+test("listCompletedRuns still sorts healthy runs when a parseable run file has the wrong shape", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-shape-"));
+  try {
+    await writePlaybook(cwd);
+    await saveRun(cwd, completedRun("older-run", "2026-06-02T09:00:00.000Z"));
+    await saveRun(cwd, completedRun("newer-run", "2026-06-02T11:00:00.000Z"));
+    // A hand-edited file used to throw `b.updatedAt.localeCompare is not a function`
+    // inside the history sort, dropping every healthy run from the listing.
+    const badPath = join(cwd, ".pi", "playbook-runs", "handedited-run.json");
+    await writeFile(badPath, '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}', "utf8");
+
+    const runs = await listCompletedRuns(cwd);
+    assert.deepEqual(runs.map((run) => run.runId), ["newer-run", "older-run"]);
+
+    const scan = await scanCompletedRuns(cwd);
+    assert.deepEqual(scan.runs.map((run) => run.runId), ["newer-run", "older-run"]);
+    assert.equal(scan.problems.length, 1);
+    assert.match(scan.problems[0], /handedited-run\.json/);
+    assert.match(scan.problems[0], /cannot be used/);
+    assert.match(scan.problems[0], /field "updatedAt" is a number instead of a string/);
+    assert.equal(await readFile(badPath, "utf8"), '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}');
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("/playbook:history lists healthy runs and names a wrong-shape file instead of throwing", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-shape-ui-"));
+  try {
+    await writePlaybook(cwd);
+    await saveRun(cwd, completedRun("healthy-run", "2026-06-02T10:00:00.000Z"));
+    const badPath = join(cwd, ".pi", "playbook-runs", "handedited-run.json");
+    await writeFile(badPath, '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}', "utf8");
+    const ui = new MockUi();
+
+    await handlePlaybookCommand({ getCommands: () => [] } as any, "history", { cwd, hasUI: true, ui } as any);
+
+    assert.equal(ui.notifications.length, 1);
+    const messages = ui.notifications.map((item) => item.message).join("\n");
+    assert.match(messages, /healthy-run — Feature Development Playbook — 2026-06-02T10:00:00\.000Z — complete/);
+    assert.match(messages, /Final outcome: complete/);
+    assert.match(messages, /handedited-run\.json/);
+    assert.match(messages, /cannot be used/);
+    assert.match(messages, /repair or delete it/);
+    assert.equal(ui.notifications.at(-1)?.level, "warning");
+
+    // The wrong-shape file is reported without being deleted or rewritten.
+    assert.equal(await readFile(badPath, "utf8"), '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}');
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("/playbook:history lists the healthy run and names the corrupt file instead of failing", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-corrupt-ui-"));
   try {

@@ -69,36 +69,50 @@ const completedRun = { runId: "host-run", playbookId: "host-playbook", currentSt
   createdAt: "2026-06-01T00:00:00Z", updatedAt: "2026-06-01T01:00:00Z",
   history: [{ at: "2026-06-01T01:00:00Z", step: "done", outcome: "complete", to: "complete" }] };
 
+// A hand-edited file that still parses but lacks the fields the listing reads.
+const wrongShapeRun = '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}';
+
 test("actual Pi history renders a completed run, handles corrupt state and reloads without inference", { timeout: 130_000 }, async () => {
   const root = await mkdtemp(join(tmpdir(), "playbook-real-history-"));
   const runPath = join(root, ".pi/playbook-runs/host-run.json");
   const brokenPath = join(root, ".pi/playbook-runs/broken-run.json");
   try {
     await mkdir(join(root, ".pi/playbook-runs"), { recursive: true });
-    for (const corrupt of [false, true, false]) {
+    for (const mode of ["clean", "unparsable", "wrong-shape", "clean"] as const) {
       await writeFile(runPath, JSON.stringify(completedRun));
-      if (corrupt) await writeFile(brokenPath, "not valid json", "utf8");
+      if (mode === "unparsable") await writeFile(brokenPath, "not valid json", "utf8");
+      else if (mode === "wrong-shape") await writeFile(brokenPath, wrongShapeRun, "utf8");
       else await rm(brokenPath, { force: true });
 
-      const rows = await hostHistory(root, /Completed: host-playbook/, corrupt ? "warning" : "info");
+      const rows = await hostHistory(root, /Completed: host-playbook/, mode === "clean" ? "info" : "warning");
       assert.ok(!rows.some((r) => ["agent_start", "message_start", "tool_execution_start"].includes(r.type ?? "")));
 
       const message = rows.find((r) => r.method === "notify" && (r.message?.includes("Completed: host-playbook") ?? false))?.message ?? "";
       // The healthy completed run is listed whether or not another run file is damaged.
       assert.match(message, /Run: host-run/);
       assert.match(message, /Final outcome: complete/);
-      if (corrupt) {
+      if (mode === "unparsable") {
         // The damaged file is named once with an actionable cause, never as a raw parser error.
         assert.match(message, /broken-run\.json/);
         assert.match(message, /cannot be read: invalid JSON/);
         assert.match(message, /left unchanged/);
         assert.doesNotMatch(message, /Unexpected token/);
         assert.equal(rows.filter((r) => r.method === "notify" && (r.message?.includes("broken-run.json") ?? false)).length, 1);
+      } else if (mode === "wrong-shape") {
+        // Parseable-but-wrong-shape state used to throw inside the history sort and
+        // produce zero notifications; the real host must list the healthy run and
+        // name the unusable file once instead.
+        assert.match(message, /broken-run\.json/);
+        assert.match(message, /cannot be used/);
+        assert.match(message, /field "updatedAt" is a number instead of a string/);
+        assert.match(message, /left unchanged/);
+        assert.equal(rows.filter((r) => r.method === "notify" && (r.message?.includes("broken-run.json") ?? false)).length, 1);
       } else {
         assert.doesNotMatch(message, /broken-run\.json/);
       }
       // No state file was deleted or rewritten automatically.
-      if (corrupt) assert.equal(await readFile(brokenPath, "utf8"), "not valid json");
+      if (mode === "unparsable") assert.equal(await readFile(brokenPath, "utf8"), "not valid json");
+      if (mode === "wrong-shape") assert.equal(await readFile(brokenPath, "utf8"), wrongShapeRun);
       assert.equal(await readFile(runPath, "utf8"), JSON.stringify(completedRun));
     }
   } finally { await rm(root, { recursive: true, force: true }); }
