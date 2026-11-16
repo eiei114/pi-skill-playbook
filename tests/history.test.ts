@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { handlePlaybookCommand } from "../extensions/index.js";
@@ -9,6 +9,7 @@ import {
   formatCompletedRunLine,
   listCompletedRunSummaries,
   listCompletedRuns,
+  scanCompletedRuns,
   summarizeCompletedRun,
 } from "../src/history.js";
 import { saveRun } from "../src/state.js";
@@ -103,6 +104,104 @@ test("listCompletedRunSummaries resolves names for each run's playbook", async (
       "Release Readiness Playbook",
       "Feature Development Playbook",
     ]);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("listCompletedRuns keeps healthy runs when one run file is corrupt", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-corrupt-"));
+  try {
+    await writePlaybook(cwd);
+    await saveRun(cwd, completedRun("healthy-run", "2026-06-02T10:00:00.000Z"));
+    await writeFile(join(cwd, ".pi", "playbook-runs", "broken-run.json"), "not valid json", "utf8");
+    await writeFile(join(cwd, ".pi", "playbook-runs", "truncated-run.json"), '{"runId":"truncated-run"', "utf8");
+
+    const runs = await listCompletedRuns(cwd);
+    assert.deepEqual(runs.map((run) => run.runId), ["healthy-run"]);
+
+    const scan = await scanCompletedRuns(cwd);
+    assert.deepEqual(scan.runs.map((run) => run.runId), ["healthy-run"]);
+    assert.equal(scan.problems.length, 2);
+    assert.match(scan.problems.join("\n"), /broken-run\.json/);
+    assert.match(scan.problems.join("\n"), /truncated-run\.json/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("listCompletedRuns still sorts healthy runs when a parseable run file has the wrong shape", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-shape-"));
+  try {
+    await writePlaybook(cwd);
+    await saveRun(cwd, completedRun("older-run", "2026-06-02T09:00:00.000Z"));
+    await saveRun(cwd, completedRun("newer-run", "2026-06-02T11:00:00.000Z"));
+    // A hand-edited file used to throw `b.updatedAt.localeCompare is not a function`
+    // inside the history sort, dropping every healthy run from the listing.
+    const badPath = join(cwd, ".pi", "playbook-runs", "handedited-run.json");
+    await writeFile(badPath, '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}', "utf8");
+
+    const runs = await listCompletedRuns(cwd);
+    assert.deepEqual(runs.map((run) => run.runId), ["newer-run", "older-run"]);
+
+    const scan = await scanCompletedRuns(cwd);
+    assert.deepEqual(scan.runs.map((run) => run.runId), ["newer-run", "older-run"]);
+    assert.equal(scan.problems.length, 1);
+    assert.match(scan.problems[0], /handedited-run\.json/);
+    assert.match(scan.problems[0], /cannot be used/);
+    assert.match(scan.problems[0], /field "updatedAt" is a number instead of a string/);
+    assert.equal(await readFile(badPath, "utf8"), '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}');
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("/playbook:history lists healthy runs and names a wrong-shape file instead of throwing", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-shape-ui-"));
+  try {
+    await writePlaybook(cwd);
+    await saveRun(cwd, completedRun("healthy-run", "2026-06-02T10:00:00.000Z"));
+    const badPath = join(cwd, ".pi", "playbook-runs", "handedited-run.json");
+    await writeFile(badPath, '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}', "utf8");
+    const ui = new MockUi();
+
+    await handlePlaybookCommand({ getCommands: () => [] } as any, "history", { cwd, hasUI: true, ui } as any);
+
+    assert.equal(ui.notifications.length, 1);
+    const messages = ui.notifications.map((item) => item.message).join("\n");
+    assert.match(messages, /healthy-run — Feature Development Playbook — 2026-06-02T10:00:00\.000Z — complete/);
+    assert.match(messages, /Final outcome: complete/);
+    assert.match(messages, /handedited-run\.json/);
+    assert.match(messages, /cannot be used/);
+    assert.match(messages, /repair or delete it/);
+    assert.equal(ui.notifications.at(-1)?.level, "warning");
+
+    // The wrong-shape file is reported without being deleted or rewritten.
+    assert.equal(await readFile(badPath, "utf8"), '{"runId":"handedited-run","status":"completed","updatedAt":42,"history":[]}');
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("/playbook:history lists the healthy run and names the corrupt file instead of failing", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-corrupt-ui-"));
+  try {
+    await writePlaybook(cwd);
+    await saveRun(cwd, completedRun("healthier-run", "2026-06-02T10:00:00.000Z"));
+    const brokenPath = join(cwd, ".pi", "playbook-runs", "broken-run.json");
+    await writeFile(brokenPath, "not valid json", "utf8");
+    const ui = new MockUi();
+
+    await handlePlaybookCommand({ getCommands: () => [] } as any, "history", { cwd, hasUI: true, ui } as any);
+
+    const messages = ui.notifications.map((item) => item.message).join("\n");
+    assert.match(messages, /healthier-run — Feature Development Playbook — 2026-06-02T10:00:00\.000Z — complete/);
+    assert.match(messages, /broken-run\.json/);
+    assert.match(messages, /repair or delete it/);
+    assert.equal(ui.notifications.at(-1)?.level, "warning");
+
+    // No state file was deleted or rewritten automatically.
+    assert.equal(await readFile(brokenPath, "utf8"), "not valid json");
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }

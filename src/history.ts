@@ -1,5 +1,5 @@
 import { findPlaybook, loadPlaybooks } from "./playbooks.js";
-import { listRunIds, loadRun } from "./state.js";
+import { scanRuns } from "./state.js";
 import type { PlaybookRunState } from "./types.js";
 
 export interface CompletedRunSummary {
@@ -15,9 +15,19 @@ export function finalOutcome(run: PlaybookRunState): string {
 }
 
 export async function listCompletedRuns(cwd: string): Promise<PlaybookRunState[]> {
-  const ids = await listRunIds(cwd);
-  const runs = (await Promise.all(ids.map((id) => loadRun(cwd, id)))).filter((run): run is PlaybookRunState => Boolean(run));
-  return runs.filter((run) => run.status === "completed").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return (await scanCompletedRuns(cwd)).runs;
+}
+
+/**
+ * Load completed runs while keeping damaged run files out of the way: healthy
+ * runs are returned and each unreadable file is reported once by name.
+ */
+export async function scanCompletedRuns(cwd: string): Promise<{ runs: PlaybookRunState[]; problems: string[] }> {
+  const { runs, problems } = await scanRuns(cwd);
+  const completed = runs
+    .filter((run) => run.status === "completed")
+    .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return { runs: completed, problems };
 }
 
 export async function summarizeCompletedRun(cwd: string, run: PlaybookRunState): Promise<CompletedRunSummary> {

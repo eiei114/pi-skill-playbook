@@ -1,8 +1,17 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { lastAssistantText, parseOutcomeMarker, parseSkillInvocation, planCompletion, renderPlaybookPrompt } from "../src/auto-advance.js";
-import { formatCompletedRunLine, listCompletedRunSummaries, renderCompletedRunDetail } from "../src/history.js";
+import { formatCompletedRunLine, renderCompletedRunDetail, scanCompletedRuns, summarizeCompletedRuns } from "../src/history.js";
 import { formatRunDiff, formatRunDiffPairLabel, loadRecentRunDiffs } from "../src/run-diff.js";
-import { clearActiveRun, createRunId, listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
+import {
+  clearActiveRun,
+  createRunId,
+  loadActiveRunIdSafe,
+  loadRun,
+  loadRunSafe,
+  saveRun,
+  scanRuns,
+  setActiveRun,
+} from "../src/state.js";
 import { findPlaybook, loadPlaybooks } from "../src/playbooks.js";
 import { getGitignoreAdvisory } from "../src/gitignore.js";
 import { renderValidationErrors } from "../src/render.js";
@@ -69,26 +78,39 @@ export default function piSkillPlaybook(pi: ExtensionAPI) {
 
   pi.on("session_start", async (_event, ctx) => {
     if (!ctx.hasUI) return;
-    const activeRunId = await loadActiveRunId(ctx.cwd);
-    if (!activeRunId) {
-      ctx.ui.setWidget(WIDGET_ID, undefined);
-      return;
+    try {
+      const active = await loadActiveRunIdSafe(ctx.cwd);
+      if (active.problem) {
+        reportStateProblems(ctx.ui, [active.problem]);
+        return;
+      }
+      if (!active.runId) {
+        ctx.ui.setWidget(WIDGET_ID, undefined);
+        return;
+      }
+      const loaded = await loadRunSafe(ctx.cwd, active.runId);
+      if (loaded.error) {
+        reportStateProblems(ctx.ui, [loaded.error.message]);
+        return;
+      }
+      const run = loaded.run;
+      if (!run || run.status !== "active") {
+        await clearActiveRun(ctx.cwd);
+        ctx.ui.setWidget(WIDGET_ID, undefined);
+        return;
+      }
+      const playbook = await findPlaybook(ctx.cwd, run.playbookId);
+      if (!playbook) {
+        ctx.ui.setWidget(WIDGET_ID, [`Playbook run '${run.runId}' references missing playbook '${run.playbookId}'.`], {
+          placement: "belowEditor",
+        });
+        return;
+      }
+      const presentation = await buildRunStatusPresentation(ctx.cwd, playbook, run, getAvailableSkills(pi));
+      ctx.ui.setWidget(WIDGET_ID, presentation.lines, { placement: "belowEditor" });
+    } catch (error) {
+      reportStateProblems(ctx.ui, [error instanceof Error ? error.message : String(error)]);
     }
-    const run = await loadRun(ctx.cwd, activeRunId);
-    if (!run || run.status !== "active") {
-      await clearActiveRun(ctx.cwd);
-      ctx.ui.setWidget(WIDGET_ID, undefined);
-      return;
-    }
-    const playbook = await findPlaybook(ctx.cwd, run.playbookId);
-    if (!playbook) {
-      ctx.ui.setWidget(WIDGET_ID, [`Playbook run '${run.runId}' references missing playbook '${run.playbookId}'.`], {
-        placement: "belowEditor",
-      });
-      return;
-    }
-    const presentation = await buildRunStatusPresentation(ctx.cwd, playbook, run, getAvailableSkills(pi));
-    ctx.ui.setWidget(WIDGET_ID, presentation.lines, { placement: "belowEditor" });
   });
 
   pi.on("input", (event) => {
@@ -265,7 +287,7 @@ async function cancelRun(cwd: string, ui: UiLike | undefined): Promise<void> {
   if (!run) return;
 
   if (run.status !== "active") {
-    if ((await loadActiveRunId(cwd)) === run.runId) await clearActiveRun(cwd);
+    if ((await currentActiveRunId(cwd)) === run.runId) await clearActiveRun(cwd);
     clearWidget(ui);
     notify(ui, `Run '${run.runId}' is already ${run.status}.`, "info");
     return;
@@ -276,13 +298,13 @@ async function cancelRun(cwd: string, ui: UiLike | undefined): Promise<void> {
   run.updatedAt = now;
   run.history.push({ at: now, step: run.currentStep, outcome: "cancelled", to: "cancelled" });
   await saveRun(cwd, run);
-  if ((await loadActiveRunId(cwd)) === run.runId) await clearActiveRun(cwd);
+  if ((await currentActiveRunId(cwd)) === run.runId) await clearActiveRun(cwd);
   clearWidget(ui);
   notify(ui, `Cancelled playbook run ${run.runId}.`, "info");
 }
 
 async function showStatus(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
-  const runId = await loadActiveRunId(cwd);
+  const runId = await currentActiveRunId(cwd);
   if (!runId) {
     notify(ui, "No active playbook run. Browse finished runs with /playbook:history.", "info");
     clearWidget(ui);
@@ -311,6 +333,7 @@ async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
   const diffs = hasSelectionUI(ui)
     ? await loadRecentRunDiffs(cwd)
     : await loadRecentRunDiffs(cwd, 2);
+  const problems = (await scanRuns(cwd)).problems;
   if (diffs.length === 0) {
     notify(
       ui,
@@ -318,8 +341,9 @@ async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
         "Not enough completed runs to compare.",
         "You need at least 2 completed runs to see a run diff.",
         "Complete runs with /playbook:done; browse finished runs with /playbook:history.",
+        ...problems,
       ].join("\n"),
-      "info",
+      problems.length > 0 ? "warning" : "info",
     );
     return;
   }
@@ -334,23 +358,25 @@ async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
       })),
     );
     if (!selected) return;
-    notify(ui, formatRunDiff(selected).join("\n"), "info");
+    notify(ui, [...formatRunDiff(selected), ...problems].join("\n"), problems.length > 0 ? "warning" : "info");
     return;
   }
 
-  notify(ui, formatRunDiff(diffs[0]).join("\n"), "info");
+  notify(ui, [...formatRunDiff(diffs[0]), ...problems].join("\n"), problems.length > 0 ? "warning" : "info");
 }
 
 async function showHistory(cwd: string, ui: UiLike | undefined): Promise<void> {
-  const summaries = await listCompletedRunSummaries(cwd);
+  const { runs, problems } = await scanCompletedRuns(cwd);
+  const summaries = await summarizeCompletedRuns(cwd, runs);
   if (summaries.length === 0) {
     notify(
       ui,
       [
         "No completed playbook runs.",
         "Active runs resume with /playbook:resume; finished runs stay in .pi/playbook-runs/ as read-only history.",
+        ...problems,
       ].join("\n"),
-      "info",
+      problems.length > 0 ? "warning" : "info",
     );
     return;
   }
@@ -362,7 +388,7 @@ async function showHistory(cwd: string, ui: UiLike | undefined): Promise<void> {
       summaries.map((summary) => ({ label: formatCompletedRunLine(summary), value: summary })),
     );
     if (!selected) return;
-    notify(ui, renderCompletedRunDetail(selected).join("\n"), "info");
+    notify(ui, [...renderCompletedRunDetail(selected), ...problems].join("\n"), problems.length > 0 ? "warning" : "info");
     return;
   }
 
@@ -373,7 +399,7 @@ async function showHistory(cwd: string, ui: UiLike | undefined): Promise<void> {
   if (summaries.length === 1) {
     lines.push("", ...renderCompletedRunDetail(summaries[0]));
   }
-  notify(ui, lines.join("\n"), "info");
+  notify(ui, [...lines, ...problems].join("\n"), problems.length > 0 ? "warning" : "info");
 }
 
 async function completeCurrentStep(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined): Promise<void> {
@@ -471,10 +497,11 @@ async function pickActiveRun(cwd: string, ui: UiLike | undefined, title: string)
     return undefined;
   }
 
-  const runs = await getActiveRuns(cwd);
+  const { runs, problems } = await getActiveRuns(cwd);
+  if (problems.length > 0) notify(ui, problems.join("\n"), "warning");
   if (runs.length === 0) {
     clearWidget(ui);
-    notify(ui, "No active playbook runs. Start one with /playbook:start.", "info");
+    if (problems.length === 0) notify(ui, "No active playbook runs. Start one with /playbook:start.", "info");
     return undefined;
   }
 
@@ -487,10 +514,11 @@ async function pickRunToCancel(cwd: string, ui: UiLike | undefined): Promise<Pla
     return undefined;
   }
 
-  const runs = await getActiveRuns(cwd);
+  const { runs, problems } = await getActiveRuns(cwd);
+  if (problems.length > 0) notify(ui, problems.join("\n"), "warning");
   if (runs.length === 0) {
     clearWidget(ui);
-    notify(ui, "No active playbook runs to cancel.", "info");
+    if (problems.length === 0) notify(ui, "No active playbook runs to cancel.", "info");
     return undefined;
   }
 
@@ -620,9 +648,10 @@ export async function processAgentCompletionForTest(
 }
 
 async function loadActiveIfAvailable(cwd: string): Promise<{ run: PlaybookRunState; playbook: LoadedPlaybook } | undefined> {
-  const runId = await loadActiveRunId(cwd);
-  if (!runId) return undefined;
-  const run = await loadRun(cwd, runId);
+  const active = await loadActiveRunIdSafe(cwd);
+  if (active.problem || !active.runId) return undefined;
+  const loaded = await loadRunSafe(cwd, active.runId);
+  const run = loaded.run;
   if (!run || run.status !== "active") return undefined;
   const playbook = await findPlaybook(cwd, run.playbookId);
   if (!playbook) return undefined;
@@ -630,7 +659,7 @@ async function loadActiveIfAvailable(cwd: string): Promise<{ run: PlaybookRunSta
 }
 
 async function loadActive(cwd: string): Promise<{ run: PlaybookRunState; playbook: LoadedPlaybook }> {
-  const runId = await loadActiveRunId(cwd);
+  const runId = await currentActiveRunId(cwd);
   if (!runId) throw new Error("No active playbook run.");
   const run = await loadRun(cwd, runId);
   if (!run) throw new Error(`Active run '${runId}' not found.`);
@@ -678,10 +707,26 @@ function usage(): string {
   ].join("\n");
 }
 
-async function getActiveRuns(cwd: string): Promise<PlaybookRunState[]> {
-  const ids = await listRunIds(cwd);
-  const runs = (await Promise.all(ids.map((id) => loadRun(cwd, id)))).filter((run): run is PlaybookRunState => Boolean(run));
-  return runs.filter((run) => run.status === "active").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+async function getActiveRuns(cwd: string): Promise<{ runs: PlaybookRunState[]; problems: string[] }> {
+  const { runs, problems } = await scanRuns(cwd);
+  const active = runs.filter((run) => run.status === "active").sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+  return { runs: active, problems };
+}
+
+/** Best-effort active pointer read; damaged pointers become user-visible problems. */
+async function currentActiveRunId(cwd: string): Promise<string | undefined> {
+  const active = await loadActiveRunIdSafe(cwd);
+  if (active.problem) throw new Error(active.problem);
+  return active.runId;
+}
+
+function reportStateProblems(ui: UiLike | undefined, problems: string[]): void {
+  clearWidget(ui);
+  notify(
+    ui,
+    ["Playbook run state could not be loaded.", ...problems, "Repair or delete the damaged file, then restart; no playbook state file was changed."].join("\n"),
+    "warning",
+  );
 }
 
 interface UiLike {
