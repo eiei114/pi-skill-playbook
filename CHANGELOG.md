@@ -4,6 +4,12 @@
 
 ### Changed
 
+- Tighten playbook validation so a malformed definition can no longer pass: `doneWhen: []` is now rejected as "must be a non-empty string array", and `entry`, `primarySkill`, transition `to`, and active-run `currentStep` lookups only accept keys actually declared in the playbook instead of any inherited object property such as `toString` or `valueOf`. Run-state validation also no longer throws when a playbook has no `steps` map. Two related fixes: a non-object `skills` value no longer iterates string characters into bogus `skills.0` errors, and a non-object `steps` value no longer crashes run validation.
+
+- Add `tests/validation-corpus.test.ts`: a table-driven corpus that starts from one valid playbook, applies a single mutation per case, and pins the exact rejection message (path prefix included) for 32 validation paths plus the duplicate-id and run-state rejections.
+
+- Bump package version to `1.5.15` for the validation strictness fixes.
+
 - Tolerate a corrupt run-state file: a damaged `.pi/playbook-runs/<id>.json` (truncated JSON, hand-edited JSON, or the wrong shape such as a non-string `updatedAt` or a non-array `history`) no longer breaks `/playbook:history`, `/playbook:rundiff`, the run-selection UI, or the `session_start` hook. Healthy runs are still listed, each damaged file is reported once by path with an actionable message, and no state file is deleted or rewritten automatically. Direct single-run loads (`/playbook:status`, `/playbook:done`) now fail with the same path-named message instead of a bare `SyntaxError`.
 
 - Bump package version to `1.5.14` for the corrupt run-state tolerance.

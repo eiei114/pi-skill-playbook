@@ -34,11 +34,11 @@ export function validatePlaybook(
 
   if (!isRecord(pb.steps)) return { valid: errors.length === 0, errors, warnings };
 
-  if (isNonEmptyString(pb.entry) && !(pb.entry in pb.steps)) {
+  if (isNonEmptyString(pb.entry) && !hasOwnKey(pb.steps, pb.entry)) {
     errors.push(`${pathPrefix}entry step '${pb.entry}' is missing`);
   }
 
-  for (const [skillName, skill] of Object.entries(pb.skills ?? {})) {
+  for (const [skillName, skill] of Object.entries(isRecord(pb.skills) ? pb.skills : {})) {
     if (!ID_PATTERN.test(skillName)) warnings.push(`${pathPrefix}skill '${skillName}' is not lower-kebab-case`);
     if (!isRecord(skill)) {
       errors.push(`${pathPrefix}skills.${skillName} must be an object`);
@@ -59,7 +59,7 @@ export function validatePlaybook(
     if (!isNonEmptyString(step.primarySkill)) {
       errors.push(`${pathPrefix}steps.${stepId}.primarySkill is required`);
     } else {
-      if (!isRecord(pb.skills) || !(step.primarySkill in pb.skills)) {
+      if (!hasOwnKey(pb.skills, step.primarySkill)) {
         errors.push(`${pathPrefix}steps.${stepId}.primarySkill '${step.primarySkill}' is not declared in skills`);
       }
       if (options.requireSkills && !availableSkills.has(step.primarySkill)) {
@@ -68,7 +68,7 @@ export function validatePlaybook(
     }
 
     if (!isNonEmptyString(step.commandHint)) errors.push(`${pathPrefix}steps.${stepId}.commandHint is required`);
-    if (!Array.isArray(step.doneWhen) || step.doneWhen.some((item) => !isNonEmptyString(item))) {
+    if (!Array.isArray(step.doneWhen) || step.doneWhen.length === 0 || step.doneWhen.some((item) => !isNonEmptyString(item))) {
       errors.push(`${pathPrefix}steps.${stepId}.doneWhen must be a non-empty string array`);
     }
     if (!Array.isArray(step.transitions)) {
@@ -89,7 +89,7 @@ export function validatePlaybook(
         }
         if (!isNonEmptyString(transition.to)) {
           errors.push(`${pathPrefix}steps.${stepId}.transition.to is required`);
-        } else if (transition.to !== "complete" && !(transition.to in pb.steps)) {
+        } else if (transition.to !== "complete" && !hasOwnKey(pb.steps, transition.to)) {
           errors.push(`${pathPrefix}steps.${stepId}.transition '${transition.outcome}' targets missing step '${transition.to}'`);
         }
       }
@@ -119,7 +119,7 @@ export function validateRunState(playbook: LoadedPlaybook | undefined, run: Play
     errors.push(`run '${run.runId}' references missing playbook '${run.playbookId}'`);
     return errors;
   }
-  if (run.status === "active" && !(run.currentStep in playbook.definition.steps)) {
+  if (run.status === "active" && !hasOwnKey(playbook.definition.steps, run.currentStep)) {
     errors.push(`run '${run.runId}' points to missing step '${run.currentStep}'`);
   }
   return errors;
@@ -127,6 +127,10 @@ export function validateRunState(playbook: LoadedPlaybook | undefined, run: Play
 
 export function normalizeSkillCommandName(name: string): string {
   return name.replace(/^\//, "").replace(/^skill:/, "");
+}
+
+function hasOwnKey(map: Record<string, unknown> | undefined, key: string): boolean {
+  return isRecord(map) && Object.hasOwn(map, key);
 }
 
 function isRecord(value: unknown): value is Record<string, any> {
