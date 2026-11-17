@@ -39,8 +39,13 @@ export type BehaviorInput = {
   };
 };
 
+export type SdkPackageManifest = {
+  devDependencies?: Record<string, string>;
+};
+
 export const VERIFICATION_CONTRACT: "pi-sdk-behavior-v2";
-export const SDK_VERSIONS: Readonly<Record<string, "1.1.0">>;
+export const SDK_PACKAGE_NAMES: readonly string[];
+export function sdkVersionsFromManifest(packageJson: SdkPackageManifest): Readonly<Record<string, string>>;
 export const UNHANDLED_ERROR_PATTERN: RegExp;
 export const EXTENSION_LOAD_ERROR_PATTERN: RegExp;
 export function parseJsonLines(output: string): unknown[];

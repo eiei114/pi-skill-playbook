@@ -1,10 +1,20 @@
 export const VERIFICATION_CONTRACT = "pi-sdk-behavior-v2";
-export const SDK_VERSIONS = Object.freeze({
-  "@earendil-works/pi-agent-core": "1.5.0",
-  "@earendil-works/pi-ai": "1.5.0",
-  "@earendil-works/pi-coding-agent": "1.5.0",
-  "@earendil-works/pi-tui": "1.5.0",
-});
+export const SDK_PACKAGE_NAMES = Object.freeze([
+  "@earendil-works/pi-agent-core",
+  "@earendil-works/pi-ai",
+  "@earendil-works/pi-coding-agent",
+  "@earendil-works/pi-tui",
+]);
+
+export function sdkVersionsFromManifest(packageJson) {
+  return Object.freeze(Object.fromEntries(SDK_PACKAGE_NAMES.map((name) => {
+    const version = packageJson?.devDependencies?.[name];
+    if (typeof version !== "string" || !version.trim()) {
+      throw new Error(`Expected exact devDependency ${name} to be pinned in package.json`);
+    }
+    return [name, version];
+  })));
+}
 
 export const UNHANDLED_ERROR_PATTERN = /UnhandledPromiseRejection|uncaught exception|shutdown error/i;
 export const EXTENSION_LOAD_ERROR_PATTERN = /Failed to load extension|Error loading extension/i;

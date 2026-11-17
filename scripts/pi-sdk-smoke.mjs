@@ -7,7 +7,8 @@ import { parse as parseYaml } from "yaml";
 import {
   behaviorAssertions,
   EXTENSION_LOAD_ERROR_PATTERN,
-  SDK_VERSIONS,
+  SDK_PACKAGE_NAMES,
+  sdkVersionsFromManifest,
   UNHANDLED_ERROR_PATTERN,
   VERIFICATION_CONTRACT,
 } from "./pi-sdk-smoke-contract.mjs";
@@ -18,14 +19,12 @@ const reportPath = process.argv.includes("--update-curated-report")
   : resolve(root, ".tmp/pi-sdk-smoke.json");
 const packageJson = JSON.parse(readFileSync(resolve(root, "package.json"), "utf8"));
 const readJson = (path) => JSON.parse(readFileSync(path, "utf8"));
-const manifestVersions = Object.fromEntries(Object.entries(SDK_VERSIONS).map(([name, expected]) => {
-  if (packageJson.devDependencies?.[name] !== expected) {
-    throw new Error(`Expected exact devDependency ${name}=${expected}`);
-  }
+const manifestVersions = sdkVersionsFromManifest(packageJson);
+for (const name of SDK_PACKAGE_NAMES) {
+  const expected = manifestVersions[name];
   const installed = readJson(resolve(root, "node_modules", name, "package.json")).version;
   if (installed !== expected) throw new Error(`Expected installed ${name}=${expected}; got ${installed}`);
-  return [name, installed];
-}));
+}
 
 const piPackagePath = resolve(root, "node_modules/@earendil-works/pi-coding-agent/package.json");
 const piPackage = readJson(piPackagePath);
