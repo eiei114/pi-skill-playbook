@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import {
   behaviorAssertions,
   parseJsonLines,
-  SDK_VERSIONS,
+  SDK_PACKAGE_NAMES,
+  sdkVersionsFromManifest,
   VERIFICATION_CONTRACT,
 } from "../scripts/pi-sdk-smoke-contract.mjs";
 import type { BehaviorInput } from "../scripts/pi-sdk-smoke-contract.mjs";
@@ -44,14 +46,22 @@ const input = (overrides: Partial<BehaviorInput> = {}): BehaviorInput => ({
   ...overrides,
 });
 
-test("SDK smoke contract uses the frozen SDK dictionary and handles LF/CRLF RPC lines", () => {
+test("SDK smoke contract reads exact SDK pins from the manifest and handles LF/CRLF RPC lines", () => {
   assert.equal(VERIFICATION_CONTRACT, "pi-sdk-behavior-v2");
-  assert.deepEqual(SDK_VERSIONS, {
-    "@earendil-works/pi-agent-core": "1.5.0",
-    "@earendil-works/pi-ai": "1.5.0",
-    "@earendil-works/pi-coding-agent": "1.5.0",
-    "@earendil-works/pi-tui": "1.5.0",
-  });
+  assert.deepEqual(SDK_PACKAGE_NAMES, [
+    "@earendil-works/pi-agent-core",
+    "@earendil-works/pi-ai",
+    "@earendil-works/pi-coding-agent",
+    "@earendil-works/pi-tui",
+  ]);
+  const manifest = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
+  assert.deepEqual(sdkVersionsFromManifest(manifest), Object.fromEntries(
+    SDK_PACKAGE_NAMES.map((name) => [name, manifest.devDependencies[name]]),
+  ));
+  assert.deepEqual(sdkVersionsFromManifest({
+    devDependencies: Object.fromEntries(SDK_PACKAGE_NAMES.map((name, index) => [name, `0.0.${index + 1}`])),
+  }), Object.fromEntries(SDK_PACKAGE_NAMES.map((name, index) => [name, `0.0.${index + 1}`])));
+  assert.throws(() => sdkVersionsFromManifest({ devDependencies: {} }), /Expected exact devDependency/);
   assert.deepEqual(parseJsonLines(`not-json\r\n${JSON.stringify(prompt)}\n\n`), [prompt]);
 });
 
