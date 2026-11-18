@@ -40,7 +40,7 @@ test("htmlToText inserts newlines for block-level closing tags", () => {
     "<div>div</div>",
     "<ul><li>li</li></ul>",
     "<h1>h1</h1><h2>h2</h2><h3>h3</h3><h4>h4</h4><h5>h5</h5><h6>h6</h6>",
-    "a<br>b</br>c",
+    "a<br>b",
     "<table><tr><td>t</td></tr></table><p>end</p>",
   ].join("");
   const text = htmlToText(html);
@@ -53,7 +53,8 @@ test("htmlToText inserts newlines for block-level closing tags", () => {
   assert.match(text, /h4\n/);
   assert.match(text, /h5\n/);
   assert.match(text, /h6\n/);
-  assert.match(text, /b\n/);
+  assert.match(text, /a\nb/);
+  assert.equal(htmlToText("a<br>b"), "a\nb");
   assert.match(text, /t\n/);
   assert.doesNotMatch(text, /<\w/);
 });
