@@ -59,7 +59,7 @@ export function htmlToText(html: string): string {
     .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<style[\s\S]*?<\/style>/gi, " ");
   const text = withoutScripts
-    .replace(/<\/(p|div|li|h\d|br|tr)>/gi, "\n")
+    .replace(/<\/(p|div|li|h\d|tr)>|<\/?br\b[^>]*>/gi, "\n")
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/gi, " ")
     .replace(/&amp;/gi, "&")

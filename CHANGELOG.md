@@ -4,6 +4,8 @@
 
 ### Changed
 
+- `htmlToText` now turns real `<br>` tags (`<br>`, `<br/>`, `<br />`, and `<br>` with attributes) into line breaks instead of spaces, and adds `tests/url-content.test.ts` covering `htmlToText`, `fetchUrlContent`, and `fetchUrlContents`. Not released on its own; ships with the next version bump.
+
 - Tighten playbook validation so a malformed definition can no longer pass: `doneWhen: []` is now rejected as "must be a non-empty string array", and `entry`, `primarySkill`, transition `to`, and active-run `currentStep` lookups only accept keys actually declared in the playbook instead of any inherited object property such as `toString` or `valueOf`. Run-state validation also no longer throws when a playbook has no `steps` map. Two related fixes: a non-object `skills` value no longer iterates string characters into bogus `skills.0` errors, and a non-object `steps` value no longer crashes run validation.
 
 - Add `tests/validation-corpus.test.ts`: a table-driven corpus that starts from one valid playbook, applies a single mutation per case, and pins the exact rejection message (path prefix included) for 32 validation paths plus the duplicate-id and run-state rejections.
