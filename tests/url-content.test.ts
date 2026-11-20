@@ -55,6 +55,9 @@ test("htmlToText inserts newlines for block-level closing tags", () => {
   assert.match(text, /h6\n/);
   assert.match(text, /a\nb/);
   assert.equal(htmlToText("a<br>b"), "a\nb");
+  assert.equal(htmlToText("a<br/>b<br />c"), "a\nb\nc");
+  assert.equal(htmlToText('a<br class="break">b'), "a\nb");
+  assert.equal(htmlToText("a<bravo>b</bravo>c"), "a b c");
   assert.match(text, /t\n/);
   assert.doesNotMatch(text, /<\w/);
 });
