@@ -114,6 +114,49 @@ test("/playbook:choose maps the selected label back to its outcome", async () =>
   }
 });
 
+test("/playbook:resume selects the intended run without changing the other active run", async () => {
+  resetGitignoreAdvisorySessionForTest();
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-select-resume-"));
+  try {
+    await writePlaybook(cwd, "feature-development.yml", basePlaybookYaml);
+    const selectedRun = await activeRun(cwd, "feature-development-selected", "grill");
+    const otherRun = await activeRun(cwd, "feature-development-keep", "prd");
+    selectedRun.updatedAt = "2026-11-20T16:00:00.000Z";
+    otherRun.updatedAt = "2026-11-20T16:01:00.000Z";
+    await saveRun(cwd, selectedRun);
+    await saveRun(cwd, otherRun);
+    await setActiveRun(cwd, otherRun.runId);
+    const otherRunBefore = await readFile(runFile(cwd, otherRun.runId));
+    const ui = new MockUi((_title, options) => options.find((option) => option.startsWith(`${selectedRun.runId} —`)));
+
+    await handlePlaybookCommand(fakePi as any, "resume", { cwd, hasUI: true, ui } as any);
+
+    assert.equal(ui.selects.length, 1);
+    assert.equal(ui.selects[0].title, "Resume which playbook run?");
+    assert.deepEqual(ui.selects[0].options.slice().sort(), [
+      `${selectedRun.runId} — ${selectedRun.playbookId} (updated ${selectedRun.updatedAt})`,
+      `${otherRun.runId} — ${otherRun.playbookId} (updated ${otherRun.updatedAt})`,
+    ].sort());
+    assert.equal(ui.selects[0].options[1], `${selectedRun.runId} — ${selectedRun.playbookId} (updated ${selectedRun.updatedAt})`);
+    assert.equal(await loadActiveRunId(cwd), selectedRun.runId);
+    assert.deepEqual(ui.widgets.at(-1), [
+      "Validation: ok",
+      "",
+      "Playbook: Feature Development Playbook",
+      `Run: ${selectedRun.runId}`,
+      "Step: grill",
+      "Next: /skill:grill-with-docs <feature idea>",
+      "Done when:",
+      "  - Problem boundary is clear.",
+      "Outcomes: ready-for-prd -> prd, needs-rework -> grill",
+    ]);
+    assert.deepEqual(await readFile(runFile(cwd, otherRun.runId)), otherRunBefore);
+    assert.equal((await loadRun(cwd, otherRun.runId))?.status, "active");
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("/playbook:cancel decline leaves active runs and active pointer unchanged", async () => {
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-select-cancel-decline-"));
   try {
