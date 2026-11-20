@@ -1,11 +1,11 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { handlePlaybookCommand, resetGitignoreAdvisorySessionForTest } from "../extensions/index.js";
 import { GITIGNORE_SNIPPET } from "../src/gitignore.js";
-import { listRunIds, loadActiveRunId, loadRun, saveRun, setActiveRun } from "../src/state.js";
+import { activeFile, listRunIds, loadActiveRunId, loadRun, runFile, saveRun, setActiveRun } from "../src/state.js";
 import type { PlaybookRunState } from "../src/types.js";
 
 const basePlaybookYaml = `
@@ -46,6 +46,7 @@ const fakePi = {
 class MockUi {
   notifications: Array<{ message: string; level: "info" | "warning" | "error" }> = [];
   selects: Array<{ title: string; options: string[] }> = [];
+  confirmations: Array<{ title: string; message: string }> = [];
   widgets: Array<string[] | undefined> = [];
   confirmResult = true;
 
@@ -60,7 +61,8 @@ class MockUi {
     return this.choose(title, options);
   }
 
-  async confirm() {
+  async confirm(title: string, message: string) {
+    this.confirmations.push({ title, message });
     return this.confirmResult;
   }
 
@@ -107,6 +109,68 @@ test("/playbook:choose maps the selected label back to its outcome", async () =>
     assert.deepEqual(ui.selects[0].options, ["ready-for-prd → prd", "needs-rework → grill"]);
     assert.equal(updated?.currentStep, "prd");
     assert.equal(updated?.history.at(-1)?.outcome, "ready-for-prd");
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("/playbook:cancel decline leaves active runs and active pointer unchanged", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-select-cancel-decline-"));
+  try {
+    const selectedRun = await activeRun(cwd, "feature-development-selected", "grill");
+    const otherRun = await activeRun(cwd, "maintenance-keep", "prd");
+    await saveRun(cwd, selectedRun);
+    await saveRun(cwd, otherRun);
+    await setActiveRun(cwd, otherRun.runId);
+
+    const beforeRunFiles = await Promise.all([selectedRun, otherRun].map((run) => readFile(runFile(cwd, run.runId))));
+    const beforeActivePointer = await readFile(activeFile(cwd));
+    const ui = new MockUi((_title, options) => options.find((option) => option.startsWith(`${selectedRun.runId} —`)));
+    ui.confirmResult = false;
+
+    await handlePlaybookCommand(fakePi as any, "cancel", { cwd, hasUI: true, ui } as any);
+
+    assert.equal(ui.selects.length, 1);
+    assert.equal(ui.selects[0].title, "Cancel which playbook run?");
+    assert.deepEqual(ui.selects[0].options.slice().sort(), [
+      `${selectedRun.runId} — ${selectedRun.playbookId} (updated ${selectedRun.updatedAt})`,
+      `${otherRun.runId} — ${otherRun.playbookId} (updated ${otherRun.updatedAt})`,
+    ].sort());
+    assert.deepEqual(ui.confirmations, [{
+      title: "Cancel playbook run?",
+      message: `${selectedRun.runId} (${selectedRun.playbookId}) will be marked cancelled.`,
+    }]);
+    assert.deepEqual(await Promise.all([selectedRun, otherRun].map((run) => readFile(runFile(cwd, run.runId)))), beforeRunFiles);
+    assert.deepEqual(await readFile(activeFile(cwd)), beforeActivePointer);
+    assert.equal(await loadActiveRunId(cwd), otherRun.runId);
+    assert.equal((await loadRun(cwd, selectedRun.runId))?.status, "active");
+    assert.equal((await loadRun(cwd, otherRun.runId))?.status, "active");
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("/playbook:cancel confirmation cancels only the selected run", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-select-cancel-confirm-"));
+  try {
+    const selectedRun = await activeRun(cwd, "feature-development-selected", "grill");
+    const otherRun = await activeRun(cwd, "maintenance-keep", "prd");
+    await saveRun(cwd, selectedRun);
+    await saveRun(cwd, otherRun);
+    await setActiveRun(cwd, otherRun.runId);
+    const ui = new MockUi((_title, options) => options.find((option) => option.startsWith(`${selectedRun.runId} —`)));
+
+    await handlePlaybookCommand(fakePi as any, "cancel", { cwd, hasUI: true, ui } as any);
+
+    assert.deepEqual(ui.confirmations, [{
+      title: "Cancel playbook run?",
+      message: `${selectedRun.runId} (${selectedRun.playbookId}) will be marked cancelled.`,
+    }]);
+    const cancelled = await loadRun(cwd, selectedRun.runId);
+    assert.equal(cancelled?.status, "cancelled");
+    assert.equal(cancelled?.history.at(-1)?.outcome, "cancelled");
+    assert.equal((await loadRun(cwd, otherRun.runId))?.status, "active");
+    assert.equal(await loadActiveRunId(cwd), otherRun.runId);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
