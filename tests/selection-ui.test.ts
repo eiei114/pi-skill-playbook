@@ -1,12 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { join, relative } from "node:path";
 import { tmpdir } from "node:os";
 import { handlePlaybookCommand, resetGitignoreAdvisorySessionForTest } from "../extensions/index.js";
 import { GITIGNORE_SNIPPET } from "../src/gitignore.js";
+import { loadPlaybooks } from "../src/playbooks.js";
 import { activeFile, listRunIds, loadActiveRunId, loadRun, runFile, saveRun, setActiveRun } from "../src/state.js";
 import type { PlaybookRunState } from "../src/types.js";
+import { validatePlaybook } from "../src/validation.js";
 
 const basePlaybookYaml = `
 version: 1
@@ -219,6 +221,65 @@ test("/playbook:cancel confirmation cancels only the selected run", async () => 
   }
 });
 
+for (const command of ["start", "resume", "cancel", "choose"] as const) {
+  test(`/playbook:${command} without the Pi TUI leaves usable playbook state unchanged`, async () => {
+    const cwd = await mkdtemp(join(tmpdir(), `pi-playbook-headless-${command}-`));
+    try {
+      await writePlaybook(cwd, "feature-development.yml", basePlaybookYaml);
+      await writePlaybook(cwd, "maintenance.yml", secondPlaybookYaml);
+      const selectedRun = await activeRun(cwd, "feature-development-selected", "grill");
+      const otherRun = await activeRun(cwd, "feature-development-keep", "prd");
+      await saveRun(cwd, selectedRun);
+      await saveRun(cwd, otherRun);
+      await setActiveRun(cwd, selectedRun.runId);
+
+      const playbooks = await loadPlaybooks(cwd);
+      assert.deepEqual(playbooks.map((playbook) => playbook.definition.id).sort(), ["feature-development", "maintenance"]);
+      for (const playbook of playbooks) {
+        assert.equal(validatePlaybook(playbook, new Set(["grill-with-docs"])).valid, true);
+      }
+      assert.equal((await loadRun(cwd, selectedRun.runId))?.status, "active");
+      assert.equal((await loadRun(cwd, otherRun.runId))?.status, "active");
+
+      const before = await snapshotTree(cwd);
+      const unavailableUiCalls: string[] = [];
+      const unavailableUi = {
+        notify: () => unavailableUiCalls.push("notify"),
+        setWidget: () => unavailableUiCalls.push("setWidget"),
+      };
+      assert.equal("select" in unavailableUi, false);
+      assert.equal("confirm" in unavailableUi, false);
+
+      let skillInvocations = 0;
+      let skillLookups = 0;
+      const piWithoutTui = {
+        getCommands: () => {
+          skillLookups++;
+          return [{ source: "skill", name: "skill:grill-with-docs" }];
+        },
+        sendUserMessage: () => skillInvocations++,
+        runSkill: () => skillInvocations++,
+      };
+
+      await assert.doesNotReject(
+        handlePlaybookCommand(piWithoutTui as any, command, { cwd, hasUI: false, ui: unavailableUi } as any),
+      );
+
+      assert.deepEqual(unavailableUiCalls, []);
+      assert.equal(skillInvocations, 0);
+      assert.equal(skillLookups, 0);
+      assert.deepEqual(await snapshotTree(cwd), before);
+      assert.equal(await loadActiveRunId(cwd), selectedRun.runId);
+      assert.equal((await loadRun(cwd, selectedRun.runId))?.currentStep, "grill");
+      assert.equal((await loadRun(cwd, selectedRun.runId))?.status, "active");
+      assert.equal((await loadRun(cwd, otherRun.runId))?.currentStep, "prd");
+      assert.equal((await loadRun(cwd, otherRun.runId))?.status, "active");
+    } finally {
+      await rm(cwd, { recursive: true, force: true });
+    }
+  });
+}
+
 test("gitignore advisory is shown once per session across start and status", async () => {
   resetGitignoreAdvisorySessionForTest();
   const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-gitignore-session-"));
@@ -261,6 +322,22 @@ async function writePlaybook(cwd: string, file: string, yaml: string) {
   const dir = join(cwd, ".pi", "playbooks");
   await mkdir(dir, { recursive: true });
   await writeFile(join(dir, file), yaml, "utf8");
+}
+
+async function snapshotTree(root: string): Promise<Array<[string, string]>> {
+  const files: Array<[string, string]> = [];
+  const visit = async (directory: string): Promise<void> => {
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const path = join(directory, entry.name);
+      if (entry.isDirectory()) {
+        await visit(path);
+      } else if (entry.isFile()) {
+        files.push([relative(root, path), (await readFile(path)).toString("base64")]);
+      }
+    }
+  };
+  await visit(root);
+  return files.sort(([left], [right]) => left.localeCompare(right));
 }
 
 async function activeRun(cwd: string, runId: string, currentStep: string): Promise<PlaybookRunState> {
