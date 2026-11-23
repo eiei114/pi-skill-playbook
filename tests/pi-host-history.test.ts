@@ -8,6 +8,7 @@ import test from "node:test";
 
 const cli = fileURLToPath(new URL("../node_modules/@earendil-works/pi-coding-agent/dist/cli.js", import.meta.url));
 const extension = fileURLToPath(new URL("../extensions/index.ts", import.meta.url));
+const historyModel = "history-only";
 // Explicit finite deadline per spawned Pi process (30s maximum, plus one cleanup grace second).
 const PROBE_DEADLINE_MS = 30_000;
 interface Row {
@@ -18,7 +19,8 @@ interface Row {
 async function hostHistory(root: string, expected: RegExp, level: string): Promise<Row[]> {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [cli, "--offline", "--no-session", "--no-tools", "--no-extensions",
-      "--no-skills", "--no-context-files", "--no-prompt-templates", "-e", extension, "--mode", "rpc"],
+      "--no-skills", "--no-context-files", "--no-prompt-templates", "--no-mcp",
+      "--model", `playbook-test/${historyModel}`, "-e", extension, "--mode", "rpc"],
     { cwd: root, env: { ...process.env, PI_CODING_AGENT_DIR: join(root, "agent") }, windowsHide: true, stdio: ["pipe", "pipe", "pipe"] });
     const rows: Row[] = [];
     let tail = "", stderr = "", bytes = 0, sent = false, ended = false, failure = "";
@@ -77,6 +79,20 @@ test("actual Pi history renders a completed run, handles corrupt state and reloa
   const runPath = join(root, ".pi/playbook-runs/host-run.json");
   const brokenPath = join(root, ".pi/playbook-runs/broken-run.json");
   try {
+    // Pi 1.6 warns at RPC startup if no model is available. Give it a local
+    // placeholder, not a real provider: /playbook:history must never infer.
+    const agentDir = join(root, "agent");
+    await mkdir(agentDir, { recursive: true });
+    await writeFile(join(agentDir, "models.json"), JSON.stringify({
+      providers: {
+        "playbook-test": {
+          baseUrl: "http://127.0.0.1:0/v1",
+          api: "openai-completions",
+          apiKey: "test-only",
+          models: [{ id: historyModel }],
+        },
+      },
+    }));
     await mkdir(join(root, ".pi/playbook-runs"), { recursive: true });
     for (const mode of ["clean", "unparsable", "wrong-shape", "clean"] as const) {
       await writeFile(runPath, JSON.stringify(completedRun));
