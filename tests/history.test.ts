@@ -207,6 +207,40 @@ test("/playbook:history lists the healthy run and names the corrupt file instead
   }
 });
 
+test("/playbook:history browses stored runs when playbook YAML is invalid", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-history-invalid-definition-"));
+  try {
+    await saveRun(cwd, completedRun("older-run", "2026-06-01T10:00:00.000Z"));
+    await saveRun(cwd, completedRun("newer-run", "2026-06-02T10:00:00.000Z"));
+    const definitionPath = join(cwd, ".pi", "playbooks", "feature-development.yml");
+    const invalidYaml = "name: [unclosed\n";
+    await writePlaybook(cwd);
+    await writeFile(definitionPath, invalidYaml, "utf8");
+    const runPath = join(cwd, ".pi", "playbook-runs", "older-run.json");
+    const storedRun = await readFile(runPath, "utf8");
+    const ui = new MockUi((_title, options) => options[1]);
+    const pi = { getCommands: () => [] } as any;
+    const ctx = { cwd, hasUI: true, ui } as any;
+
+    await handlePlaybookCommand(pi, "history", ctx);
+
+    assert.equal(ui.selects.length, 1);
+    assert.equal(ui.selects[0].options[1], "older-run — feature-development — 2026-06-01T10:00:00.000Z — complete");
+    assert.equal(ui.notifications.length, 1);
+    const [{ message, level }] = ui.notifications;
+    assert.equal(level, "warning");
+    assert.match(message, /Completed: feature-development\nRun: older-run/);
+    assert.match(message, /Final outcome: complete/);
+    assert.match(message, /grill → complete \(complete\)/);
+    assert.match(message, /Could not look up playbook names; showing stored playbook IDs/);
+    assert.equal(await readFile(runPath, "utf8"), storedRun);
+    assert.equal(await readFile(definitionPath, "utf8"), invalidYaml);
+    await assert.rejects(handlePlaybookCommand(pi, "start", ctx));
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
 test("finalOutcome falls back to complete when history is empty", () => {
   const run = completedRun("run-1", "2026-06-08T12:00:00.000Z");
   run.history = [];
