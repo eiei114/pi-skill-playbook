@@ -367,7 +367,9 @@ async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
 
 async function showHistory(cwd: string, ui: UiLike | undefined): Promise<void> {
   const { runs, problems } = await scanCompletedRuns(cwd);
-  const summaries = await summarizeCompletedRuns(cwd, runs);
+  const summaries = await summarizeCompletedRuns(cwd, runs, () => {
+    problems.push("Could not look up playbook names; showing stored playbook IDs.");
+  });
   if (summaries.length === 0) {
     notify(
       ui,

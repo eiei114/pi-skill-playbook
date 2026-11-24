@@ -35,10 +35,19 @@ export async function summarizeCompletedRun(cwd: string, run: PlaybookRunState):
   return createCompletedRunSummary(run, playbook?.definition.name ?? run.playbookId);
 }
 
-export async function summarizeCompletedRuns(cwd: string, runs: PlaybookRunState[]): Promise<CompletedRunSummary[]> {
+export async function summarizeCompletedRuns(
+  cwd: string,
+  runs: PlaybookRunState[],
+  onNameLookupFailure?: () => void,
+): Promise<CompletedRunSummary[]> {
   if (runs.length === 0) return [];
 
-  const playbooks = await loadPlaybooks(cwd);
+  const playbooks = await loadPlaybooks(cwd).catch((error: unknown) => {
+    // Only callers that can report the fallback opt in; loading is still strict elsewhere.
+    if (!onNameLookupFailure) throw error;
+    onNameLookupFailure();
+    return [];
+  });
   const namesById = new Map<string, string>();
   for (const playbook of playbooks) {
     if (!namesById.has(playbook.definition.id)) namesById.set(playbook.definition.id, playbook.definition.name);
