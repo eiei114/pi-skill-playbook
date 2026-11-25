@@ -140,12 +140,18 @@ export function formatRunDiff(result: RunDiffResult): string[] {
  *
  * Returns at most count - 1 results. Each result compares entry[i] (newer)
  * against entry[i + 1] (older).
+ * Pass onNameLookupFailure to report a lookup error and compare using stored IDs.
  */
-export async function loadRecentRunDiffs(cwd: string, count?: number): Promise<RunDiffResult[]> {
+export async function loadRecentRunDiffs(
+  cwd: string,
+  count?: number,
+  onNameLookupFailure?: () => void,
+): Promise<RunDiffResult[]> {
   const runs = await listCompletedRuns(cwd);
   const maxRuns = count ?? runs.length;
   const limit = Math.min(maxRuns, runs.length);
-  const summaries = await summarizeCompletedRuns(cwd, runs.slice(0, limit));
+  if (limit < 2) return [];
+  const summaries = await summarizeCompletedRuns(cwd, runs.slice(0, limit), onNameLookupFailure);
   const entries = summaries.map((summary) => toRunDiffEntry(summary.run, summary.playbookName));
   const results: RunDiffResult[] = [];
 
