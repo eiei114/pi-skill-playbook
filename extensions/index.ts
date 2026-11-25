@@ -330,10 +330,10 @@ async function showStatus(pi: ExtensionAPI, cwd: string, ui: UiLike | undefined)
 }
 
 async function showRunDiff(cwd: string, ui: UiLike | undefined): Promise<void> {
-  const diffs = hasSelectionUI(ui)
-    ? await loadRecentRunDiffs(cwd)
-    : await loadRecentRunDiffs(cwd, 2);
   const problems = (await scanRuns(cwd)).problems;
+  const diffs = await loadRecentRunDiffs(cwd, hasSelectionUI(ui) ? undefined : 2, () => {
+    problems.push("Could not look up playbook names; showing stored playbook IDs.");
+  });
   if (diffs.length === 0) {
     notify(
       ui,

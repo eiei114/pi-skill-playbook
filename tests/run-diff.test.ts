@@ -302,10 +302,40 @@ test("/playbook:rundiff shows diff for two completed runs", async () => {
     const ui = new MockUi();
     await handlePlaybookCommand({ getCommands: () => [] } as any, "rundiff", { cwd, hasUI: true, ui } as any);
 
-    const message = ui.notifications.map((item) => item.message).join("\n");
+    assert.equal(ui.notifications.length, 1);
+    const [{ message, level }] = ui.notifications;
+    assert.equal(level, "info");
     assert.match(message, /Run diff:/);
     assert.match(message, /run-2 vs run-1/);
+    assert.match(message, /Newer: Feature Development Playbook/);
+    assert.match(message, /Older: Feature Development Playbook/);
     assert.match(message, /All steps match/);
+  } finally {
+    await rm(cwd, { recursive: true, force: true });
+  }
+});
+
+test("/playbook:rundiff compares saved runs with a warning when playbook YAML is invalid", async () => {
+  const cwd = await mkdtemp(join(tmpdir(), "pi-playbook-rundiff-invalid-definition-"));
+  try {
+    await writePlaybook(cwd, "name: [unclosed\n");
+    await saveRun(cwd, makeRun("run-2", "2026-06-02T12:00:00.000Z", baseHistoryChanged));
+    await saveRun(cwd, makeRun("run-1", "2026-06-01T12:00:00.000Z", baseHistorySame));
+
+    const ui = new MockUi();
+    const pi = { getCommands: () => [] } as any;
+    const ctx = { cwd, hasUI: true, ui } as any;
+    await assert.rejects(handlePlaybookCommand(pi, "start", ctx), { name: "YAMLParseError" });
+    await handlePlaybookCommand(pi, "rundiff", ctx);
+
+    assert.equal(ui.notifications.length, 1);
+    const [{ message, level }] = ui.notifications;
+    assert.equal(level, "warning");
+    assert.match(message, /Run diff: run-2 vs run-1/);
+    assert.match(message, /Newer: feature-development/);
+    assert.match(message, /Older: feature-development/);
+    assert.match(message, /Step 2 "prd" differs/);
+    assert.match(message, /Could not look up playbook names; showing stored playbook IDs\./);
   } finally {
     await rm(cwd, { recursive: true, force: true });
   }
@@ -378,8 +408,8 @@ steps:
     transitions: []
 `;
 
-async function writePlaybook(cwd: string) {
+async function writePlaybook(cwd: string, yaml = basePlaybookYaml) {
   const dir = join(cwd, ".pi", "playbooks");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, "feature-development.yml"), basePlaybookYaml, "utf8");
+  await writeFile(join(dir, "feature-development.yml"), yaml, "utf8");
 }
